@@ -1,0 +1,548 @@
+import * as React from 'react';
+import TimeAgo from 'react-timeago';
+
+import type { SxProps } from '@mui/joy/styles/types';
+import { Avatar, Box } from '@mui/joy';
+import Face6Icon from '@mui/icons-material/Face6';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActiveOutlined';
+import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+
+import { SystemPurposeId, SystemPurposes } from '../../data';
+
+import { llmsGetVendorIcon } from '~/modules/llms/components/LLMVendorIcon';
+
+import type { MetricsChatGenerateCost_Md } from '~/common/stores/metrics/metrics.chatgenerate';
+import type { DMessage, DMessageGenerator, DMessageRole } from '~/common/stores/chat/chat.message';
+import type { UIComplexityMode } from '~/common/app.theme';
+import { PhPaintBrush } from '~/common/components/icons/phosphor/PhPaintBrush';
+import { animationColorRainbow } from '~/common/util/animUtils';
+import { formatModelsCost } from '~/common/util/costUtils';
+import { modelLabelTitleCase } from '~/common/util/textUtils';
+import { llmsStoreState } from '~/common/stores/llms/store-llms';
+
+
+
+// configuration
+export const ANIM_BUSY_TYPING = 'https://i.giphy.com/media/jJxaUysjzO9ri/giphy.webp';
+const ANIM_BUSY_DOWNLOADING = 'https://i.giphy.com/26u6dIwIphLj8h10A.webp'; // hourglass: https://i.giphy.com/TFSxpAIYz5inJGuY8f.webp, small-lq: https://i.giphy.com/131tNuGktpXGhy.webp, floppy: https://i.giphy.com/RxR1KghIie2iI.webp
+const ANIM_BUSY_PAINTING = 'https://i.giphy.com/media/5t9ujj9cMisyVjUZ0m/giphy.webp';
+const ANIM_BUSY_THINKING = 'https://i.giphy.com/media/l44QzsOLXxcrigdgI/giphy.webp';
+
+
+export const avatarIconSx = {
+  borderRadius: 'sm',
+  height: 36,
+  width: 36,
+} as const;
+
+// const largerAvatarIconsSx = {
+//   borderRadius: 'sm',
+//   width: 48,
+//   height: 48,
+// };
+
+const aixSkipBoxSx = {
+  height: 36,
+  width: 36,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const aixSkipIconSx = {
+  color: 'neutral.solidBg',
+};
+
+const tooltipSx: SxProps = {
+  fontSize: 'sm',
+  p: 1,
+  display: 'grid',
+  gap: 1,
+};
+
+const tooltipIconContainerSx: SxProps = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+};
+
+const tooltipCreationTimeSx: SxProps = {
+  fontSize: 'xs',
+  color: 'text.tertiary',
+};
+
+const tooltipMetricsGridSx: SxProps = {
+  // grid of 2 columns, the first fits the labels, the other expends with the values
+  display: 'grid',
+  gridTemplateColumns: 'auto 1fr',
+  columnGap: 1,
+  rowGap: 0.5,
+};
+
+
+/** Whole message background color, based on the message role and state */
+export function messageBackground(messageRole: DMessageRole | string, userCommand: 'draw' | 'react' | false, wasEdited: boolean, isAssistantIssue: boolean): string {
+  switch (messageRole) {
+    case 'user':
+      return userCommand === 'draw' ? 'warning.softActiveBg'
+        : userCommand === 'react' ? 'success.softHoverBg'
+          : 'primary.plainHoverBg'; // was .background.level1
+    case 'assistant':
+      return isAssistantIssue ? 'danger.softBg' : 'background.surface';
+    case 'system':
+      return wasEdited ? 'warning.softHoverBg' : 'neutral.softBg';
+    default:
+      return '#ff0000';
+  }
+}
+
+
+/** Message avatar icon, based on the message role and state (e.g. notification pending, is generating, etc.) */
+export function makeMessageAvatarIcon(
+  uiComplexityMode: UIComplexityMode,
+  messageRole: DMessageRole | string,
+  messageGeneratorName: string | undefined,
+  messagePurposeId: SystemPurposeId | string | undefined,
+  messageIncomplete: boolean,
+  messageFlagAixSkip: boolean,
+  messageFlaxNotifyComplete: boolean,
+  larger: boolean,
+): React.JSX.Element {
+
+  const nameOfRole =
+    messageRole === 'user' ? 'You'
+      : messageRole === 'assistant' ? 'Assistant'
+        : 'System';
+
+  // if skipped, just return the skip symbol
+  if (messageFlagAixSkip)
+    return <Box sx={aixSkipBoxSx}><VisibilityOffOutlinedIcon sx={aixSkipIconSx} /></Box>;
+
+  // if pending a notification, return the busy icon
+  if (messageFlaxNotifyComplete)
+    return <Box sx={aixSkipBoxSx}><NotificationsActiveIcon sx={aixSkipIconSx} /></Box>;
+
+  switch (messageRole) {
+    case 'system':
+      return <SettingsSuggestIcon sx={avatarIconSx} />;  // https://em-content.zobj.net/thumbs/120/apple/325/robot_1f916.png
+
+    case 'user':
+      return <Face6Icon sx={avatarIconSx} />;            // https://www.svgrepo.com/show/306500/openai.svg
+
+    case 'assistant':
+      const isDownload = messageGeneratorName === 'web';
+      const isTextToImage =
+        messageGeneratorName?.startsWith('GPT Image') // sync this with t2i.client.ts
+        || messageGeneratorName?.startsWith('DALL·E')
+        || messageGeneratorName === 'Prodia';
+      const isReact = messageGeneratorName?.startsWith('react-');
+
+      // Extra appearance
+      if (uiComplexityMode === 'extra') {
+
+        // Pending animations (larger too)
+        if (messageIncomplete)
+          return <Avatar
+            variant='plain'
+            alt={nameOfRole}
+            src={isDownload ? ANIM_BUSY_DOWNLOADING
+              : isTextToImage ? ANIM_BUSY_PAINTING
+                : isReact ? ANIM_BUSY_THINKING
+                  : ANIM_BUSY_TYPING}
+            sx={avatarIconSx}
+            // sx={larger ? largerAvatarIconsSx : avatarIconSx}
+          />;
+
+        // Purpose image (if present)
+        const purposeImage = SystemPurposes[messagePurposeId as SystemPurposeId]?.imageUri ?? undefined;
+        if (purposeImage)
+          return <Avatar
+            variant='plain'
+            alt={nameOfRole}
+            src={purposeImage}
+            sx={avatarIconSx}
+          />;
+
+      }
+
+      // mode: text-to-image
+      if (isTextToImage)
+        return <PhPaintBrush sx={!messageIncomplete ? avatarIconSx : {
+          ...avatarIconSx,
+          animation: `${animationColorRainbow} 1s linear infinite`,
+        }} />;
+
+      // TODO: llm symbol (if messageIncomplete)
+      // if (messageIncomplete)
+
+      // purpose symbol (if present)
+      const symbol = SystemPurposes[messagePurposeId as SystemPurposeId]?.symbol;
+      if (symbol)
+        return <Box sx={{
+          fontSize: '24px',
+          textAlign: 'center',
+          width: '100%',
+          minWidth: `${avatarIconSx.width}px`,
+          lineHeight: `${avatarIconSx.height}px`,
+        }}>
+          {symbol}
+        </Box>;
+
+      // default assistant avatar
+      return <SmartToyOutlinedIcon sx={avatarIconSx} />; // https://mui.com/static/images/avatar/2.jpg
+  }
+  return <Avatar alt={nameOfRole} />;
+}
+
+
+/** Message avatar label and tooltip, based on the message generator and state */
+export function useMessageAvatarLabel(
+  messageParts: Pick<DMessage, 'generator' | 'pendingIncomplete' | 'created' | 'updated'> | undefined,
+  complexity: UIComplexityMode,
+): { label: React.ReactNode; tooltip: React.ReactNode } {
+
+  // we do this for performance reasons, to only limit re-renders to these parts of the message
+  const { generator, pendingIncomplete, created, updated } = messageParts || {};
+
+  // OPTIMIZATION - THIS COULD BACKFIRE - THE ICON MAY NOT BE UPDATED AS OFTEN AS WE NEED
+  // -> we will only trigger updates on: updated, pendingIncomplete changes, name changes
+  // generator will change at every step (due to some structuredClone in AIX); we choose to 'lag' behind it and
+  // refresh this when other variables change
+  const laggedGeneratorRef = React.useRef<DMessageGenerator | undefined>(undefined);
+  laggedGeneratorRef.current = generator;
+  const generatorName = generator?.name ?? '';
+
+  return React.useMemo(() => {
+    if (created === undefined) {
+      return {
+        label: 'unk-msg',
+        tooltip: null,
+      };
+    }
+    const generator = laggedGeneratorRef.current;
+    if (!generator) {
+      return {
+        label: 'unk-model',
+        tooltip: null,
+      };
+    }
+
+    // Label choice: Exact label from store if available, or reported name (prettified)
+    const modelId = generator.mgt === 'aix' ? generator.aix?.mId : null;
+    const llm = modelId ? llmsStoreState().llms.find(l => l.id === modelId) : null;
+    const prettyName = modelLabelTitleCase(llm?.label || prettyShortChatModelName(generatorName));
+
+    // incomplete: just the name
+    if (pendingIncomplete)
+      return {
+        label: prettyName,
+        tooltip: (!created || complexity === 'minimal') ? null : (
+          <Box sx={tooltipSx}>
+            <TimeAgo date={created} formatter={(value: number, unit: string, _suffix: string) => `思考中 ${value} ${unit}${value > 1 ? 's' : ''}...`} />
+          </Box>
+        ),
+      };
+
+    // named generator: nothing else to do there
+    if (generator.mgt === 'named')
+      return {
+        label: prettyName,
+        tooltip: prettyName !== generator.name ? generator.name : null,
+      };
+
+    // aix generator: details galore
+    const vendorId = generator.aix?.vId ?? null;
+    const VendorIcon = (vendorId && complexity !== 'minimal') ? llmsGetVendorIcon(vendorId) : null;
+    const metrics = generator.metrics ? _prettyMetrics(generator.metrics, complexity) : null;
+    const stopReason = generator.tokenStopReason ? _prettyTokenStopReason(generator.tokenStopReason, complexity) : null;
+
+    // aix tooltip: more details
+    return {
+      label: (stopReason && complexity !== 'minimal') ? <>{prettyName} <small>({stopReason})</small></> : prettyName,
+      tooltip: complexity === 'minimal' ? null : (
+        <Box sx={tooltipSx}>
+          {VendorIcon ? <Box sx={tooltipIconContainerSx}><VendorIcon />{prettyName}</Box> : <div>{prettyName}</div>}
+          {(modelId && complexity === 'extra') && <div>{modelId}</div>}
+          {metrics && <div>{metrics}</div>}
+          {stopReason && <div>{stopReason}</div>}
+          {complexity === 'extra' && !!created && <Box sx={tooltipCreationTimeSx}>{updated ? '已更新' : '创建于'} <TimeAgo date={updated || created} />.</Box>}
+        </Box>
+      ),
+    };
+  }, [complexity, created, generatorName, pendingIncomplete, updated]);
+}
+
+function _prettyMetrics(metrics: DMessageGenerator['metrics'], uiComplexityMode: UIComplexityMode): React.ReactNode {
+  if (!metrics) return null;
+
+  const showWaitingTime = metrics?.dtStart !== undefined && (uiComplexityMode === 'extra' || metrics.dtStart >= 10000);
+  const showSpeedSection = uiComplexityMode !== 'minimal' && (showWaitingTime || metrics?.vTOutInner !== undefined);
+  const showTimeSection = showSpeedSection && !!metrics?.dtAll;
+
+  const costCode = metrics.$code ? _prettyCostCode(metrics.$code) : null;
+
+  return <Box sx={tooltipMetricsGridSx}>
+
+    {/* Tokens */}
+    {metrics?.TIn !== undefined && <div>Token:</div>}
+    {metrics?.TIn !== undefined && <div>
+      {' '}<b>{metrics.TIn?.toLocaleString() || ''}</b> 输入
+      {metrics.TCacheRead !== undefined && <>{' · '}<b>{metrics.TCacheRead?.toLocaleString() || ''}</b> 读取</>}
+      {metrics.TCacheWrite !== undefined && <>{' · '}<b>{metrics.TCacheWrite?.toLocaleString() || ''}</b> 写入</>}
+      {', '}<b>{metrics.TOut?.toLocaleString() || ''}</b> 输出
+      {metrics.TOutR !== undefined && <> (<b>{metrics.TOutR?.toLocaleString() || ''}</b> 推理)</>}
+      {/*{metrics.TOutA !== undefined && <> (<b>{metrics.TOutA?.toLocaleString() || ''}</b> for audio)</>}*/}
+    </div>}
+
+    {/* Timings */}
+    {showSpeedSection && <div>速度:</div>}
+    {showSpeedSection && <div>
+      {!!metrics.vTOutInner && <>~<b>{(Math.round(metrics.vTOutInner * 10) / 10).toLocaleString() || ''}</b> tok/s</>}
+      {showWaitingTime && (<span style={{ opacity: 0.5 }}>
+        {metrics.vTOutInner !== undefined && ' · '}
+        <span>{(Math.round(metrics.dtStart! / 100) / 10).toLocaleString() || ''}</span>秒 等待
+      </span>)}
+    </div>}
+
+    {/* Costs */}
+    {metrics?.$c !== undefined && <div>成本:</div>}
+    {metrics?.$c !== undefined && <div>
+      <b>{formatModelsCost(metrics.$c / 100)}</b>
+      {metrics.$cdCache !== undefined && <>
+        {' '}<small>(
+        {metrics.$cdCache > 0
+          ? <>缓存节省: <b>{formatModelsCost(metrics.$cdCache / 100)}</b></>
+          : <>缓存成本: <b>{formatModelsCost(-metrics.$cdCache / 100)}</b></>
+        })</small>
+      </>}
+    </div>}
+    {/* Add the 'reported' costs underneath, if defined */}
+    {metrics?.$cReported !== undefined && <div>{metrics?.$c !== undefined ? '' : '成本:'}</div>}
+    {metrics?.$cReported !== undefined && <div>
+      <small>报告: <b>{formatModelsCost(metrics.$cReported / 100)}</b></small>
+    </div>}
+    {/* Add the cost 'code' underneath, if any */}
+    {costCode && <div>{(metrics?.$c !== undefined || metrics?.$cReported !== undefined) ? '' : '成本:'}</div>}
+    {costCode && <div><em>{costCode}</em></div>}
+
+    {/* Time */}
+    {showTimeSection && <div>耗时:</div>}
+    {showTimeSection && <div><b>{(Math.round(metrics.dtAll! / 100) / 10).toLocaleString()}</b> 秒</div>}
+  </Box>;
+}
+
+function _prettyCostCode(code: MetricsChatGenerateCost_Md['$code']): string | null {
+  if (!code) return null;
+  switch (code) {
+    case 'free':
+      return '免费';
+    case 'no-tokens':
+      return '定价缺少Token信息';
+    case 'no-pricing':
+      return '无模型定价信息';
+    case 'partial-msg':
+      return '消息不完整 - 部分成本';
+    case 'partial-price':
+      return '模型定价不完整';
+  }
+}
+
+function _prettyTokenStopReason(reason: DMessageGenerator['tokenStopReason'], complexity: UIComplexityMode): string | null {
+  if (!reason) return null;
+  switch (reason) {
+    case 'client-abort':
+      return complexity !== 'minimal' ? '已停止' : '';
+    case 'filter':
+      return '已过滤';
+    case 'issue':
+      return complexity === 'extra' ? '错误' : '';
+    case 'out-of-tokens':
+      return 'Token耗尽';
+    default:
+      const _exhaustiveCheck: never = reason;
+      return null;
+  }
+}
+
+
+const oaiORegex = /gpt-[345](?:o|\.\d+)?-|o[1345]-|osb-|chatgpt-[45]o?|gpt-5-chat|computer-use-/;
+const geminiRegex = /gemini-|gemma-|learnlm-/;
+
+
+/** Pretty name for a chat model ID - VERY HARDCODED - shall use the Avatar Label-style code instead */
+export function prettyShortChatModelName(model: string | undefined): string {
+  if (!model) return '';
+
+  // TODO: fully reform this function to be using information from the DLLM, rather than this manual mapping
+
+  // [OpenAI]
+  let prefixIndex = model.search(oaiORegex);
+  if (prefixIndex !== -1) {
+    let cutModel = prefixIndex === -1 ? model : model.slice(prefixIndex);
+    // remove version: cut before the '-202..' if present
+    const versionIndex = cutModel.search(/-20\d{2}/);
+    if (versionIndex !== -1) cutModel = cutModel.slice(0, versionIndex);
+    return cutModel
+      .replace('chatgpt-', 'ChatGPT_')
+      .replace('gpt-5-chat-', 'ChatGPT-5 ')
+      .replace('gpt-', 'GPT_')
+      .replace('osb-', 'OSB_')
+      // feature variants
+      .replace('-audio', ' Audio')
+      .replace('-realtime-preview', ' Realtime')
+      .replace('-realtime', ' Realtime')
+      .replace('-search-preview', ' Search')
+      .replace('-search', ' Search')
+      .replace('-tts', ' TTS')
+      .replace('-turbo', ' Turbo')
+      // price variants
+      .replace('-pro', ' Pro')
+      .replace('-preview', ' (preview)')
+      // .replace('-latest', ' latest') // covered by catch-all
+      // size (covered by catch-all)
+      // .replace('-mini', ' mini')
+      // .replace('-micro', ' micro')
+      // .replace('-nano', ' nano')
+      // catch-all
+      .replaceAll('-', ' ')
+      .replaceAll('_', '-');
+  }
+  // [LocalAI?]
+  if (model.endsWith('.bin')) return model.slice(0, -4);
+  // [Alibaba]
+  if (model.startsWith('alibaba-qwen-') || model.startsWith('qwen-')) {
+    return model
+      .replace('alibaba-', ' ')
+      .replace('qwen', 'Qwen')
+      .replace('max', 'Max')
+      .replace('plus', 'Plus')
+      .replace('turbo', 'Turbo')
+      .replaceAll('-', ' ');
+  }
+  // [Anthropic]
+  const prettyAnthropic = _prettyAnthropicModelName(model);
+  if (prettyAnthropic) return prettyAnthropic;
+  // [Gemini]
+  prefixIndex = model.search(geminiRegex);
+  if (prefixIndex !== -1) {
+    let cutModel = prefixIndex === -1 ? model : model.slice(prefixIndex);
+    // Check for -NN-NN at the end (e.g., -05-15)
+    let datePattern = '';
+    const dateMatch = cutModel.match(/-(\d{2}-\d{2})$/);
+    if (dateMatch) {
+      datePattern = ' ' + dateMatch[1]; // extract '05-15'
+      cutModel = cutModel.slice(0, cutModel.length - dateMatch[0].length); // remove '-05-15'
+    }
+    const geminiName = cutModel
+      // commercial aliases
+      .replace('gemini-3-pro-image', 'Nano Banana Pro')
+      .replace('gemini-2.5-flash-image', 'Nano Banana')
+      // root changes
+      .replace('non-thinking', '') // NOTE: this is our variant, injected in gemini.models.ts
+      .replaceAll('-', ' ')
+      // products
+      .replace('gemini', 'Gemini')
+      .replace('gemma', 'Gemma')
+      .replace('learnlm', 'LearnLM')
+      // price variants
+      .replace('pro', 'Pro')
+      .replace('flash', 'Flash')
+      // feature variants
+      .replace('robotics er', 'Robotics')
+      .replace('generation', 'Gen')
+      .replace('image', 'Image')
+      .replace('thinking', 'Thinking')
+      .replace('preview', '')
+      .replace('experimental', 'exp')
+      .replace('exp', '(exp)');
+    return geminiName + datePattern;
+  }
+  // [Deepseek]
+  if (model.includes('deepseek-')) {
+    // start past the last /, if any
+    const lastSlashIndex = model.lastIndexOf('/');
+    const modelName = lastSlashIndex === -1 ? model : model.slice(lastSlashIndex + 1);
+    return modelName
+      // map these for each release
+      .replace('-reasoner', ' 3.2 Reasoner')
+      .replace('-chat', ' 3.2 Chat')
+      .replace('-v3', ' 3')
+      // default replacements
+      .replace('deepseek', 'Deepseek')
+      .replace('speciale', 'Speciale').replace('@', ' ')
+      .replaceAll('-', ' ')
+      .trim();
+  }
+  // [LM Studio]
+  if (model.startsWith('C:\\') || model.startsWith('D:\\'))
+    return _prettyLMStudioFileModelName(model).replace('.gguf', '');
+  // [Mistral]
+  if (model.includes('mistral-large')) return 'Mistral Large';
+  // [Ollama]
+  if (model.includes(':'))
+    return model.replace(':latest', '').replaceAll(':', ' ');
+  // [Perplexity]
+  if (model.includes('sonar-')) {
+    // capitalize each component of the name, e.g. 'sonar-pro' -> 'Sonar Pro'
+    return modelLabelTitleCase(model.replaceAll('-', ' '));
+  }
+  // [xAI]
+  if (model.includes('grok-')) {
+    if (['grok-code', 'grok-4', 'grok-3', 'grok-2'].some(m => model.includes(m))) {
+      return modelLabelTitleCase(model
+        .replace('xai-', '')
+        .replace('-beta', '')
+        .replace('-non-reasoning', '')
+        .replaceAll('-', ' '));
+    }
+    if (model.includes('grok-beta')) return 'Grok Beta';
+    if (model.includes('grok-vision-beta')) return 'Grok Vision Beta';
+  }
+  // [FireworksAI]
+  if (model.includes('accounts/')) {
+    const index = model.indexOf('accounts/');
+    const subStr = model.slice(index + 9);
+    return subStr.replaceAll('/models/', ' · ').replaceAll(/[_-]/g, ' ');
+  }
+  return model;
+}
+
+function _prettyAnthropicModelName(modelId: string): string | null {
+  if (modelId.indexOf('claude-') === -1) return null; // not a Claude model
+
+  // must match any known prefix
+  let claudeIndex = -1;
+  const claudePrefixes = ['claude-opus-4', 'claude-sonnet-4', 'claude-haiku-4', 'claude-3', 'claude-2'];
+  for (const prefix of claudePrefixes) {
+    const index = modelId.indexOf(prefix);
+    if (index !== -1) {
+      claudeIndex = index;
+      break;
+    }
+  }
+
+  const subStr = modelId.slice(claudeIndex);
+  const version =
+    subStr.includes('-4-6') ? '4.6'
+      : subStr.includes('-4-5') ? '4.5' // fixes the -5
+        : subStr.includes('-3-5') ? '3.5' // fixes the -5
+          : subStr.includes('-5') ? '5'
+            : subStr.includes('-4-1') ? '4.1'
+              : subStr.includes('-4') ? '4'
+                : subStr.includes('-3-7') ? '3.7'
+                  : subStr.includes('-3') ? '3'
+                    : '?';
+
+  if (subStr.includes(`-opus`)) return `Claude ${version} Opus`;
+  if (subStr.includes(`-sonnet`)) return `Claude ${version} Sonnet`;
+  if (subStr.includes(`-haiku`)) return `Claude ${version} Haiku`;
+
+  return `Claude ${version}`;
+}
+
+function _prettyLMStudioFileModelName(filePath: string): string {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  return normalizedPath.split('/').pop() || '';
+}

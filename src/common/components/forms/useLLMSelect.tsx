@@ -1,0 +1,371 @@
+import * as React from 'react';
+
+import type { SxProps } from '@mui/joy/styles/types';
+import { Chip, ColorPaletteProp, FormControl, IconButton, ListDivider, ListItem, ListItemButton, ListItemDecorator, Option, optionClasses, Select, SelectSlotsAndSlotProps, VariantProp } from '@mui/joy';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import BuildCircleIcon from '@mui/icons-material/BuildCircle';
+
+import { LLMVendorIconSprite } from '~/modules/llms/components/LLMVendorIconSprite';
+import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
+
+import type { DModelDomainId } from '~/common/stores/llms/model.domains.types';
+import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
+import { DLLM, DLLMId, getLLMPricing, LLM_IF_OAI_Reasoning, LLM_IF_Outputs_Audio, LLM_IF_Outputs_Image, LLM_IF_Tools_WebSearch } from '~/common/stores/llms/llms.types';
+import { ListItemGroupCollapser } from '~/common/components/ListItemGroupCollapser';
+import { PhGearSixIcon } from '~/common/components/icons/phosphor/PhGearSixIcon';
+import { StarIconUnstyled, StarredNoXL2 } from '~/common/components/StarIcons';
+import { TooltipOutlined } from '~/common/components/TooltipOutlined';
+import { findModelsServiceOrNull, getChatLLMId, llmsStoreActions } from '~/common/stores/llms/store-llms';
+import { optimaActions, optimaOpenModels } from '~/common/layout/optima/useOptima';
+import { useToggleableStringSet } from '~/common/util/hooks/useToggleableStringSet';
+import { useUIPreferencesStore } from '~/common/stores/store-ui';
+import { useVisibleLLMs } from '~/common/stores/llms/llms.hooks';
+
+import { FormLabelStart } from './FormLabelStart';
+
+
+// configuration
+const LLM_SELECT_REDUCE_OPTIONS = 10; // optimization: number of options over which only the selected is kept when closed (we'll have special notes for accessibility)
+const LLM_SELECT_SHOW_REASONING_ICON = false;
+const LLM_TEXT_PLACEHOLDER = '模型 …';
+const LLM_TEXT_CONFIGURE = '添加模型 …';
+const LLM_SPECIAL_CONFIGURE_ID = '_CONF_' as DLLMId; // special id to open the Models panel
+
+
+/*export function useLLMSelectGlobalState(): [DLLMId | null, (llmId: DLLMId | null) => void] {
+  return ...(useShallow(state => [state.chatLLMId, state.setChatLLMId]));
+}*/
+
+export function useLLMSelectLocalState(initFromGlobal: boolean): [DLLMId | null, (llmId: DLLMId | null) => void] {
+  return React.useState<DLLMId | null>(initFromGlobal ? () => {
+    return getChatLLMId();
+  } : null);
+}
+
+const _styles = {
+  select: {
+    flex: 1,
+    backgroundColor: 'background.popup',
+    // minWidth: '200',
+  },
+  chips: {
+    ml: 'auto',
+    backgroundColor: 'background.popup',
+    boxShadow: 'xs',
+  },
+  configButton: {
+    ml: 'auto',
+    my: -0.5,
+    // mr: -0.25,
+    backgroundColor: 'background.popup',
+    boxShadow: 'xs',
+  },
+  listFooter: {
+    // '--ListItem-minHeight': '2.25rem',
+    borderTop: '1px solid',
+    borderTopColor: 'divider',
+    // pb: 0,
+    position: 'sticky',
+    bottom: 0,
+    backgroundColor: 'background.surface',
+    zIndex: 1,
+  },
+  listConfSep: {
+    mb: 0,
+  },
+  listConfigure: {
+    py: 'calc(2 * var(--ListDivider-gap))',
+  },
+} as const satisfies Record<string, SxProps>;
+
+const _slotProps = {
+  // see the OptimaBarDropdown.listbox for a well made customization (max-height, max-width, etc.)
+  listbox: {
+    sx: {
+      // larger list
+      '--ListItem-paddingLeft': '1rem',
+      '--ListItem-minHeight': '2.5rem', // note that in the Optima Dropdowns we use 2.75rem
+
+      // No need for larger SVG icons here
+      // '--Icon-fontSize': 'var(--joy-fontSize-xl2)',
+
+      // remove the gutter from the bottom, which makes the 'appendConfigureModels' option look
+      // good, but makes the default case a bit too close to the bottom
+      paddingBottom: 0,
+
+      // v-size: keep the default
+      // maxHeight: 'calc(100dvh - 56px - 24px)',
+
+      // Decorator: do not change the emoji size
+      // [`& .${listItemDecoratorClasses.root}`]: {
+      //   fontSize: 'var(--joy-fontSize-lg)',
+      // } as const,
+
+      // Option: clip width to 200...360px
+      [`& .${optionClasses.root}`]: {
+        // NOTE: was maxWidth: 'min(600px, calc(100dvw - 0.25rem))', however llmSelect could be wider on Beam
+        maxWidth: 'calc(100dvw - 0.25rem)', // the small reduction is to avoid accidental h-scrolling because of the border
+        minWidth: 200,
+      } as const,
+
+      // minWidth: '100%',
+      zIndex: 1300, // on top of ScratchChat
+    } as const,
+  } as const,
+  button: {
+    'aria-description': '关闭时可能会过滤选项。打开下拉列以查看所有选项。',
+    sx: {
+      // show the full name on the button
+      whiteSpace: 'inherit',
+      wordBreak: 'break-word',
+      minWidth: '6rem',
+    } as const,
+  } as const,
+} as const satisfies SelectSlotsAndSlotProps<false>['slotProps'];
+
+
+interface LLMSelectOptions {
+  label: string;
+  sx?: SxProps;
+  color?: ColorPaletteProp;
+  variant?: VariantProp;
+  larger?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  isHorizontal?: boolean;
+  autoRefreshDomain?: DModelDomainId;
+  appendConfigureModels?: boolean; // appends a bottom option to open the Models panel
+  showStarFilter?: boolean; // show a button to filter starred models only
+}
+
+/**
+ * Select the Model, synced with either Global (Chat) LLM state, or local
+ *
+ * @param llmId (required) the LLM id
+ * @param setLlmId (required) the function to set the LLM id
+ * @param options (optional) any array of options
+ */
+export function useLLMSelect(
+  llmId: undefined | DLLMId | null, // undefined: not set at all, null: has the meaning of no-llm-wanted here
+  setLlmId: (llmId: DLLMId | null) => void,
+  options: LLMSelectOptions,
+): [DLLM | null, React.JSX.Element | null] {
+
+  // options
+  const { label, larger = false, disabled = false, placeholder = LLM_TEXT_PLACEHOLDER, isHorizontal = false, autoRefreshDomain, appendConfigureModels = false, showStarFilter = false } = options;
+
+  // state
+  const [controlledOpen, setControlledOpen] = React.useState(false);
+  const { set: collapsedServices, toggle: toggleServiceCollapse } = useToggleableStringSet<DModelsServiceId>();
+
+  // external state
+  const starredOnly = useUIPreferencesStore(state => showStarFilter && state.showModelsStarredOnly);
+  // const modelsStarredOnTop = useUIPreferencesStore(state => state.modelsStarredOnTop); // unsupported, this creates some issues with groups I believe
+  const { llms: _filteredLLMs, hasStarred } = useVisibleLLMs(llmId, starredOnly, false);
+
+  // derived state
+  const noIcons = false; //smaller;
+  const llm = !llmId ? null : _filteredLLMs.find(llm => llm.id === llmId) ?? null;
+  const isReasoning = !LLM_SELECT_SHOW_REASONING_ICON ? false : llm?.interfaces?.includes(LLM_IF_OAI_Reasoning) ?? false;
+
+
+  // Scroll preservation: MUI's useSelect auto-scrolls to highlighted item when options change - we want to preserve scroll instead
+
+  const listboxRef = React.useRef<HTMLUListElement>(null);
+
+  const listboxSlotPropsStable = React.useMemo(() => ({
+    ..._slotProps,
+    listbox: { ..._slotProps.listbox, ref: listboxRef },
+  }), []);
+
+  React.useLayoutEffect(() => {
+    // restore scroll after collapse/expand - snapshot before MUI scrolls, restore via double RAF
+    const el = listboxRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const raf = requestAnimationFrame(() => {
+      // usually works, especially on expansion
+      el.scrollTop = scrollTop;
+      return requestAnimationFrame(() => {
+        // fixes the collapse too
+        el.scrollTop = scrollTop;
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [collapsedServices]);
+
+
+  // memo LLM Options
+
+  const optimizeToSingleVisibleId = (!controlledOpen && _filteredLLMs.length > LLM_SELECT_REDUCE_OPTIONS) ? llmId : null; // id to keep visible when optimizing
+
+  const optionsArray = React.useMemo(() => {
+    // check if we have multiple services (to show collapsible headers)
+    const hasMultipleServices = _filteredLLMs.some((llm, i, arr) => i > 0 && llm.sId !== arr[i - 1].sId);
+
+    // create the option items
+    let prevServiceId: DModelsServiceId | null = null;
+    return _filteredLLMs.reduce((acc, llm, _index) => {
+
+      if (optimizeToSingleVisibleId && llm.id !== optimizeToSingleVisibleId)
+        return acc;
+
+      const serviceVendor = findModelVendor(llm.vId);
+      const isServiceCollapsed = hasMultipleServices && collapsedServices.has(llm.sId);
+
+      // add collapsible service headers when changing services
+      if (hasMultipleServices && llm.sId !== prevServiceId) {
+        if (!optimizeToSingleVisibleId) {
+          const serviceLabel = findModelsServiceOrNull(llm.sId)?.label || serviceVendor?.name || llm.sId;
+          acc.push(<ListItemGroupCollapser key={'SID-' + llm.sId} id={llm.sId} label={serviceLabel} isCollapsed={isServiceCollapsed} onToggleCollapse={toggleServiceCollapse} />);
+        }
+        prevServiceId = llm.sId;
+      }
+
+      // skip models if service is collapsed (but always show selected model)
+      if (isServiceCollapsed && llm.id !== llmId)
+        return acc;
+
+      let features = '';
+      const isNotSymlink = !llm.label.startsWith('🔗');
+      const seemsFree = !!getLLMPricing(llm)?.chat?._isFree;
+      if (isNotSymlink) {
+        // check features
+        if (seemsFree) features += '免费 ';
+        if (llm.isUserClone)
+          features += '➕ '; // is clone
+        if (llm.interfaces.includes(LLM_IF_OAI_Reasoning))
+          features += '🧠 '; // can reason
+        if (llm.interfaces.includes(LLM_IF_Tools_WebSearch))
+          features += '🌐 '; // can web search
+        if (llm.interfaces.includes(LLM_IF_Outputs_Audio))
+          features += '🔊 '; // can output audio
+        if (llm.interfaces.includes(LLM_IF_Outputs_Image))
+          features += '🖼️ '; // can draw images
+      }
+
+      const showModelOptions = llm.id === llmId && !optimizeToSingleVisibleId;
+
+      // the option component
+      acc.push(
+        <Option
+          key={llm.id}
+          value={llm.id}
+          // Disabled to avoid regenerating the memo too frequently
+          // sx={llm.id === llmId ? { fontWeight: 'md' } : undefined}
+          label={llm.label}
+        >
+          {!noIcons && (
+            <ListItemDecorator>
+              {(llm.userStarred && !starredOnly) ? <StarredNoXL2 /> : serviceVendor?.id ? <LLMVendorIconSprite vendorId={serviceVendor.id} /> : null}
+            </ListItemDecorator>
+          )}
+          {/*<Tooltip title={llm.description}>*/}
+
+          <div className='agi-ellipsize'>{llm.label}</div>
+
+          {/* Features Chips - sync with `ModelsList.tsx` */}
+          {!!features && !showModelOptions && <Chip size='sm' color={seemsFree ? 'success' : undefined} variant='plain' sx={_styles.chips}>{features.trim().replace(' ', ' ')}</Chip>}
+
+          {/* Settings button on active model (only when not optimized) */}
+          {showModelOptions && (
+            <TooltipOutlined title='模型设置'>
+              <IconButton
+                size='sm'
+                // color='neutral'
+                // variant='outlined'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  optimaActions().openModelOptions(llm.id, 'parameters');
+                }}
+                sx={_styles.configButton}
+              >
+                <PhGearSixIcon />
+              </IconButton>
+            </TooltipOutlined>
+          )}
+
+          {/*</Tooltip>*/}
+          {/*{llm.gen === 'sdxl' && <Chip size='sm' variant='outlined'>XL</Chip>} {llm.label}*/}
+        </Option>,
+      );
+
+      return acc;
+    }, [] as React.JSX.Element[]);
+  }, [_filteredLLMs, collapsedServices, llmId, noIcons, optimizeToSingleVisibleId, starredOnly, toggleServiceCollapse]);
+
+
+  const onSelectChange = React.useCallback((_event: unknown, value: DLLMId | null) => {
+    // special: open the Models panel
+    if (value === LLM_SPECIAL_CONFIGURE_ID) return optimaOpenModels();
+    // invoke the callback if the selection is non-null
+    value && setLlmId(value);
+  }, [setLlmId]);
+
+
+  const hasNoModels = _filteredLLMs.length === 0;
+  const showNoOptions = !optionsArray.length;
+
+  // memo Select
+  const llmSelectComponent = React.useMemo(() => (
+    <FormControl orientation={(isHorizontal || autoRefreshDomain) ? 'horizontal' : undefined}>
+      {!!label && <FormLabelStart title={label} sx={/*{ mb: '0.25rem' }*/ undefined} />}
+      {/*<Box sx={{ display: 'flex', justifyContent: 'space-between' }}>*/}
+      <Select
+        color={options.color}
+        variant={options.variant ?? 'outlined'}
+        value={showNoOptions ? null : llmId ?? null}
+        size={larger ? undefined : 'sm'}
+        disabled={disabled}
+        onChange={onSelectChange}
+        listboxOpen={controlledOpen}
+        onListboxOpenChange={hasNoModels ? optimaOpenModels : setControlledOpen}
+        placeholder={hasNoModels ? LLM_TEXT_CONFIGURE : placeholder}
+        slotProps={listboxSlotPropsStable}
+        endDecorator={autoRefreshDomain ?
+          <TooltipOutlined title='自动选择模型'>
+            <IconButton onClick={() => llmsStoreActions().assignDomainModelId(autoRefreshDomain, null)}>
+              <AutoModeIcon />
+            </IconButton>
+          </TooltipOutlined>
+          : isReasoning ? '🧠' : undefined}
+        sx={options.sx ?? _styles.select}
+      >
+
+        {/* Model Options */}
+        {optionsArray}
+
+        {/* Models Modal Dialog Option */}
+        {appendConfigureModels && !optimizeToSingleVisibleId && !hasNoModels && !showNoOptions && <ListDivider key='cm-sep' sx={_styles.listConfSep} />}
+        {appendConfigureModels && !optimizeToSingleVisibleId && !hasNoModels && (
+          <Option key='cm-option' variant='soft' value={LLM_SPECIAL_CONFIGURE_ID} sx={_styles.listConfigure}>
+            <ListItemDecorator><BuildCircleIcon color='success' /></ListItemDecorator>
+            模型
+            <ArrowForwardRoundedIcon sx={{ ml: 'auto', fontSize: 'xl' }} />
+          </Option>
+        )}
+
+        {/* Star Filter Toggle - shown at the top of the list only if visible */}
+        {showStarFilter && hasStarred && !optimizeToSingleVisibleId && (
+          <ListItem key='star-filter-toggle' sx={_styles.listFooter}>
+            <ListItemButton
+              variant={starredOnly ? 'soft' : 'plain'}
+              onClick={useUIPreferencesStore.getState().toggleShowModelsStarredOnly}
+              // sx={{ backgroundColor: 'background.surface', position: 'sticky', top: 0, zIndex: 1 }}
+            >
+              <ListItemDecorator>
+                <StarIconUnstyled isStarred={starredOnly} />
+              </ListItemDecorator>
+              {starredOnly ? '正在显示：已星标' : '正在显示：全部'}
+            </ListItemButton>
+          </ListItem>
+        )}
+
+      </Select>
+      {/*</Box>*/}
+    </FormControl>
+  ), [appendConfigureModels, autoRefreshDomain, controlledOpen, disabled, hasNoModels, hasStarred, isHorizontal, isReasoning, label, larger, listboxSlotPropsStable, llmId, onSelectChange, optimizeToSingleVisibleId, options.color, options.sx, options.variant, optionsArray, placeholder, showNoOptions, showStarFilter, starredOnly]);
+
+  return [llm, llmSelectComponent];
+}

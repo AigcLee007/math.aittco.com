@@ -1,0 +1,314 @@
+{
+  "rows": [
+    {
+      "modelId": "anthropic/claude-3-5-sonnet-20240620",
+      "modelName": "Claude 3.5 Sonnet",
+      "category": "CHAT",
+      "coinCost": 5,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "anthropic/claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-1.5-flash",
+      "modelName": "Gemini 1.5 Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-1.5-pro",
+      "modelName": "Gemini 1.5 Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-flash",
+      "modelName": "Gemini 3 Flash (Prefix)",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-pro",
+      "modelName": "Gemini 3 Pro (Prefix)",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3.1-pro",
+      "modelName": "Gemini 3.1 Pro (Prefix)",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3.1-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-4-turbo",
+      "modelName": "GPT-4 Turbo",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-4o",
+      "modelName": "GPT-4o",
+      "category": "CHAT",
+      "coinCost": 2,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-5.2-thinking",
+      "modelName": "Gpt-5.2-Thinking",
+      "category": "CHAT",
+      "coinCost": 10,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "openai/gpt-4o",
+      "modelName": "GPT-4o",
+      "category": "CHAT",
+      "coinCost": 5,
+      "sourceFile": "update_pricing.ts"
+    }
+  ],
+  "rawRows": [
+    {
+      "modelId": "gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3.1-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "anthropic/claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-4o",
+      "modelName": "GPT-4o",
+      "category": "CHAT",
+      "coinCost": 2,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-4-turbo",
+      "modelName": "GPT-4 Turbo",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "gpt-5.2-thinking",
+      "modelName": "Gpt-5.2-Thinking",
+      "category": "CHAT",
+      "coinCost": 10,
+      "sourceFile": "src/server/prisma/seed.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-flash",
+      "modelName": "Gemini 3 Flash (Prefix)",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-pro",
+      "modelName": "Gemini 3 Pro (Prefix)",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3.1-pro",
+      "modelName": "Gemini 3.1 Pro (Prefix)",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-1.5-flash",
+      "modelName": "Gemini 1.5 Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "googleai/gemini-1.5-pro",
+      "modelName": "Gemini 1.5 Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "openai/gpt-4o",
+      "modelName": "GPT-4o",
+      "category": "CHAT",
+      "coinCost": 5,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "anthropic/claude-3-5-sonnet-20240620",
+      "modelName": "Claude 3.5 Sonnet",
+      "category": "CHAT",
+      "coinCost": 5,
+      "sourceFile": "update_pricing.ts"
+    },
+    {
+      "modelId": "gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-flash-preview",
+      "modelName": "Gemini-3-Flash",
+      "category": "CHAT",
+      "coinCost": 1,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3-pro-preview",
+      "modelName": "Gemini-3-Pro",
+      "category": "CHAT",
+      "coinCost": 3,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "modelName": "Gemini-3.1-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "googleai/gemini-3.1-pro-preview",
+      "modelName": "Gemini-3.1-Pro",
+      "category": "CHAT",
+      "coinCost": 4,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "update_pricing_v2.ts"
+    },
+    {
+      "modelId": "anthropic/claude-opus-4-6",
+      "modelName": "Claude-Opus-4-6",
+      "category": "CHAT",
+      "coinCost": 6,
+      "sourceFile": "update_pricing_v2.ts"
+    }
+  ]
+}

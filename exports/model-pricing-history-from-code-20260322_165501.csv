@@ -1,0 +1,19 @@
+modelId,modelName,category,coinCost,sourceFile
+anthropic/claude-3-5-sonnet-20240620,Claude 3.5 Sonnet,CHAT,5,update_pricing.ts
+anthropic/claude-opus-4-6,Claude-Opus-4-6,CHAT,6,src/server/prisma/seed.ts
+claude-opus-4-6,Claude-Opus-4-6,CHAT,6,src/server/prisma/seed.ts
+gemini-3-flash-preview,Gemini-3-Flash,CHAT,1,src/server/prisma/seed.ts
+gemini-3-pro-preview,Gemini-3-Pro,CHAT,3,src/server/prisma/seed.ts
+gemini-3.1-pro-preview,Gemini-3-Pro,CHAT,4,src/server/prisma/seed.ts
+googleai/gemini-1.5-flash,Gemini 1.5 Flash,CHAT,1,update_pricing.ts
+googleai/gemini-1.5-pro,Gemini 1.5 Pro,CHAT,3,update_pricing.ts
+googleai/gemini-3-flash,Gemini 3 Flash (Prefix),CHAT,1,update_pricing.ts
+googleai/gemini-3-flash-preview,Gemini-3-Flash,CHAT,1,src/server/prisma/seed.ts
+googleai/gemini-3-pro,Gemini 3 Pro (Prefix),CHAT,3,update_pricing.ts
+googleai/gemini-3-pro-preview,Gemini-3-Pro,CHAT,3,src/server/prisma/seed.ts
+googleai/gemini-3.1-pro,Gemini 3.1 Pro (Prefix),CHAT,4,update_pricing.ts
+googleai/gemini-3.1-pro-preview,Gemini-3-Pro,CHAT,4,src/server/prisma/seed.ts
+gpt-4-turbo,GPT-4 Turbo,CHAT,3,src/server/prisma/seed.ts
+gpt-4o,GPT-4o,CHAT,2,src/server/prisma/seed.ts
+gpt-5.2-thinking,Gpt-5.2-Thinking,CHAT,10,src/server/prisma/seed.ts
+openai/gpt-4o,GPT-4o,CHAT,5,update_pricing.ts

@@ -1,0 +1,254 @@
+import { ANTHROPIC_API_PATHS, anthropicAccess } from '~/modules/llms/server/anthropic/anthropic.access';
+import { OPENAI_API_PATHS, openAIAccess } from '~/modules/llms/server/openai/openai.access';
+import { geminiAccess } from '~/modules/llms/server/gemini/gemini.access';
+import { ollamaAccess } from '~/modules/llms/server/ollama/ollama.access';
+
+import type { AixAPI_Access, AixAPI_Model, AixAPI_ResumeHandle, AixAPIChatGenerate_Request } from '../../api/aix.wiretypes';
+import type { AixDemuxers } from '../stream.demuxers';
+
+import { GeminiWire_API_Generate_Content } from '../wiretypes/gemini.wiretypes';
+
+import { aixToAnthropicMessageCreate } from './adapters/anthropic.messageCreate';
+import { aixToGeminiGenerateContent } from './adapters/gemini.generateContent';
+import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
+import { aixToOpenAIResponses } from './adapters/openai.responsesCreate';
+import { aixToXAIResponses } from './adapters/xai.responsesCreate';
+
+import type { IParticleTransmitter } from './parsers/IParticleTransmitter';
+import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
+import { createGeminiGenerateContentResponseParser } from './parsers/gemini.parser';
+import { createOpenAIChatCompletionsChunkParser, createOpenAIChatCompletionsParserNS } from './parsers/openai.parser';
+import { createOpenAIResponseParserNS, createOpenAIResponsesEventParser } from './parsers/openai.responses.parser';
+
+
+// -- Dispatch types --
+
+export type ChatGenerateDispatch = {
+  request: ChatGenerateDispatchRequest;
+  demuxerFormat: AixDemuxers.StreamDemuxerFormat;
+  chatGenerateParse: ChatGenerateParseFunction;
+};
+
+export type ChatGenerateDispatchRequest =
+  | { url: string, headers: HeadersInit, method: 'POST', body: object }
+  | { url: string, headers: HeadersInit, method: 'GET' };
+
+export type ChatGenerateParseContext = {
+  retriesAvailable: boolean;
+};
+
+export type ChatGenerateParseFunction = (partTransmitter: IParticleTransmitter, eventData: string, eventName?: string, context?: ChatGenerateParseContext) => void;
+
+
+// -- Specialized Implementations -- Core of Server-side AI Vendors abstraction --
+
+/**
+ * Specializes to the correct vendor a request for chat generation
+ */
+export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, enableResumability: boolean): ChatGenerateDispatch {
+
+  const { dialect } = access;
+  switch (dialect) {
+    case 'anthropic': {
+      const anthHost = (access.anthropicHost || '').toLowerCase();
+      const isOfficialAnthropicHost = anthHost.includes('api.anthropic.com') || anthHost.includes('anthropic.hconeai.com');
+      const isRelayAnthropicHost = !!anthHost && !isOfficialAnthropicHost;
+
+      // [Anthropic, 2025-11-24] Detect if any tool uses Programmatic Tool Calling features (allowed_callers, input_examples)
+      const usesProgrammaticToolCalling = chatGenerate.tools?.some(tool =>
+          tool.type === 'function_call' && (
+            tool.function_call.allowed_callers?.includes('code_execution') ||
+            (tool.function_call.input_examples && tool.function_call.input_examples.length > 0)
+          ),
+      ) ?? false;
+
+      const anthropicRequest = anthropicAccess(access, ANTHROPIC_API_PATHS.messages, {
+        modelIdForBetaFeatures: model.id,
+        vndAntWebFetch: model.vndAntWebFetch === 'auto',
+        vndAnt1MContext: model.vndAnt1MContext === true,
+        vndAntEffort: !!model.vndAntEffort,
+        enableSkills: !!model.vndAntSkills,
+        enableStrictOutputs: !!model.strictJsonOutput || !!model.strictToolInvocations, // [Anthropic, 2025-11-13] for both JSON output and grammar-constrained tool invocations inputs
+        enableToolSearch: !!model.vndAntToolSearch,
+        enableProgrammaticToolCalling: usesProgrammaticToolCalling,
+        // enableCodeExecution: ...
+      });
+
+      // Build the request body from model + chat parameters
+      const anthropicBody = aixToAnthropicMessageCreate(model, chatGenerate, streaming);
+
+      // Relay compatibility fallback:
+      // Some Anthropic-compatible relays reject advanced/preview fields with HTTP 400.
+      // In relay mode, prefer a conservative payload to maximize compatibility.
+      if (isRelayAnthropicHost) {
+        delete (anthropicBody as any).thinking;
+        delete (anthropicBody as any).output_config;
+        delete (anthropicBody as any).container;
+      }
+
+      // [Anthropic, 2026-02-01] Service-level inference geo routing (e.g. "us")
+      if (access.anthropicInferenceGeo && !isRelayAnthropicHost)
+        anthropicBody.inference_geo = access.anthropicInferenceGeo;
+
+      return {
+        request: {
+          ...anthropicRequest,
+          method: 'POST',
+          body: anthropicBody,
+        },
+        demuxerFormat: streaming ? 'fast-sse' : null,
+        chatGenerateParse: streaming ? createAnthropicMessageParser() : createAnthropicMessageParserNS(),
+      };
+    }
+
+    case 'gemini':
+      /**
+       * [Gemini, 2025-04-17] For newer thinking parameters, use v1alpha (we only see statistically better results)
+       * Gemini 3 thinkingLevel belongs in the same family of newer thinking controls.
+       */
+      const useV1Alpha = !!model.vndGeminiShowThoughts || model.vndGeminiThinkingBudget !== undefined || model.vndGeminiThinkingLevel !== undefined;
+      return {
+        request: {
+          ...geminiAccess(access, model.id, streaming ? GeminiWire_API_Generate_Content.streamingPostPath : GeminiWire_API_Generate_Content.postPath, useV1Alpha),
+          method: 'POST',
+          body: aixToGeminiGenerateContent(model, chatGenerate, access.minSafetyLevel, false, streaming),
+        },
+        // we verified that 'fast-sse' works well with Gemini
+        demuxerFormat: streaming ? 'fast-sse' : null,
+        chatGenerateParse: createGeminiGenerateContentResponseParser(model.id.replace('models/', ''), streaming),
+      };
+
+    /**
+     * Ollama has now an OpenAI compatibility layer for `chatGenerate` API, but still its own protocol for models listing.
+     * - as such, we 'cast' here to the dispatch to an OpenAI dispatch, while using Ollama access
+     * - we still use the ollama.router for the models listing and administration APIs
+     *
+     * For reference we show the old code for body/demuxerFormat/chatGenerateParse also below
+     */
+    case 'ollama':
+      return {
+        request: {
+          ...ollamaAccess(access, OPENAI_API_PATHS.chatCompletions), // use the OpenAI-compatible endpoint
+          method: 'POST',
+          // body: ollamaChatCompletionPayload(model, _hist, streaming),
+          body: aixToOpenAIChatCompletions('openai', model, chatGenerate, streaming),
+        },
+        // demuxerFormat: streaming ? 'json-nl' : null,
+        demuxerFormat: streaming ? 'fast-sse' : null,
+        // chatGenerateParse: createDispatchParserOllama(),
+        chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser() : createOpenAIChatCompletionsParserNS(),
+      };
+
+    default:
+      const _exhaustiveCheck: never = dialect;
+    // fallthrough
+    case 'alibaba':
+    case 'azure':
+    case 'deepseek':
+    case 'groq':
+    case 'lmstudio':
+    case 'localai':
+    case 'mistral':
+    case 'moonshot':
+    case 'openai':
+    case 'openpipe':
+    case 'openrouter':
+    case 'perplexity':
+    case 'togetherai':
+    case 'xai':
+
+      // newer: OpenAI Responses API, for models that support it and all XAI models
+      const isResponsesAPI = !!model.vndOaiResponsesAPI;
+      const isXAIModel = dialect === 'xai'; // All XAI models are accessed via Responses now
+      if (isResponsesAPI || isXAIModel) {
+        return {
+          request: {
+            ...openAIAccess(access, model.id, OPENAI_API_PATHS.responses),
+            method: 'POST',
+            /**
+             * xAI uses its own Responses API adapter.
+             *
+             * Key differences from OpenAI Responses API:
+             * - No 'instructions' field - system content prepended to first user message
+             * - xAI-native tools: web_search, x_search, code_execution
+             * - Tool calls come in single chunks
+             *
+             * Note: Response format is compatible with OpenAI parser.
+             */
+            body: isXAIModel ? aixToXAIResponses(model, chatGenerate, streaming, enableResumability)
+              : aixToOpenAIResponses(dialect, model, chatGenerate, streaming, enableResumability),
+          },
+          demuxerFormat: streaming ? 'fast-sse' : null,
+          chatGenerateParse: streaming ? createOpenAIResponsesEventParser() : createOpenAIResponseParserNS(),
+        };
+      }
+
+      // default: industry-standard OpenAI ChatCompletions API with per-dialect extensions
+      const chatCompletionsBody = aixToOpenAIChatCompletions(dialect, model, chatGenerate, streaming);
+
+      // [OpenRouter] Service-level provider routing parameter
+      if (dialect === 'openrouter' && access.orRequireParameters)
+        chatCompletionsBody.provider = { ...chatCompletionsBody.provider, require_parameters: true };
+
+      return {
+        request: {
+          ...openAIAccess(access, model.id, OPENAI_API_PATHS.chatCompletions),
+          method: 'POST',
+          body: chatCompletionsBody,
+        },
+        demuxerFormat: streaming ? 'fast-sse' : null,
+        chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser() : createOpenAIChatCompletionsParserNS(),
+      };
+
+  }
+}
+
+
+/**
+ * Specializes to the correct vendor a request for resuming chat generation (OpenAI Responses API only).
+ * Constructs a GET request to retrieve and stream a response by its ID.
+ */
+export function createChatGenerateResumeDispatch(access: AixAPI_Access, resumeHandle: AixAPI_ResumeHandle, streaming: boolean): ChatGenerateDispatch {
+
+  const { dialect } = access;
+  switch (dialect) {
+    case 'azure':
+    case 'openai':
+    case 'openrouter':
+
+      // ASSUME the OpenAI Responses API - https://platform.openai.com/docs/api-reference/responses/get
+      const { url, headers } = openAIAccess(access, '', `${OPENAI_API_PATHS.responses}/${resumeHandle.responseId}`);
+      const queryParams = new URLSearchParams({
+        stream: streaming ? 'true' : 'false',
+        ...(!!resumeHandle.startingAfter && { starting_after: resumeHandle.startingAfter.toString() }),
+        // include_obfuscation: ...
+      });
+
+      return {
+        request: { url: `${url}?${queryParams.toString()}`, method: 'GET', headers },
+        demuxerFormat: streaming ? 'fast-sse' : null,
+        chatGenerateParse: streaming ? createOpenAIResponsesEventParser() : createOpenAIResponseParserNS(),
+      };
+
+    default:
+      const _exhaustiveCheck: never = dialect;
+    // fallthrough
+    case 'alibaba':
+    case 'anthropic':
+    case 'deepseek':
+    case 'gemini':
+    case 'groq':
+    case 'lmstudio':
+    case 'localai':
+    case 'mistral':
+    case 'moonshot':
+    case 'ollama':
+    case 'openpipe':
+    case 'perplexity':
+    case 'togetherai':
+    case 'xai':
+      // Throw on unsupported protocols (Azure and OpenRouter are speculatively supported)
+      throw new Error(`Resume not supported for dialect: ${dialect}`);
+
+  }
+}

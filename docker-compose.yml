@@ -1,0 +1,75 @@
+services:
+  aittco-db:
+    image: ${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:15-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aittcouser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-aittcodb}
+    ports:
+      - "${POSTGRES_PORT:-3339}:3339"
+    command: -p 3339
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 3339 -U ${POSTGRES_USER:-aittcouser} -d ${POSTGRES_DB:-aittcodb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  aittco-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BACKEND_ALLOWED_ORIGINS: ${BACKEND_ALLOWED_ORIGINS:-http://localhost:3333}
+      BACKEND_SKIP_SSL_VERIFY: ${BACKEND_SKIP_SSL_VERIFY:-false}
+      IMAGE_PROVIDER_API_HOST: ${IMAGE_PROVIDER_API_HOST:-https://api.aittco.com}
+      BACKEND_UPSTREAM_TIMEOUT_SECONDS: ${BACKEND_UPSTREAM_TIMEOUT_SECONDS:-900}
+    ports:
+      - "${BACKEND_PORT:-3336}:3336"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3336/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  aittco-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20-slim}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      POSTGRES_PRISMA_URL: ${POSTGRES_PRISMA_URL}
+      POSTGRES_URL_NON_POOLING: ${POSTGRES_URL_NON_POOLING}
+      IMAGE_PROVIDER_API_HOST: ${IMAGE_PROVIDER_API_HOST:-https://api.aittco.com}
+      BACKEND_API_KEY: ${BACKEND_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+    depends_on:
+      aittco-db:
+        condition: service_healthy
+      aittco-backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3333}:3333"
+    volumes:
+      - ./public/uploads:/app/public/uploads
+
+volumes:
+  postgres_data:
+    name: ${DB_VOLUME_NAME:-aittco_postgres_data}
+
+networks:
+  default:
+    name: ${COMPOSE_NETWORK_NAME:-aittco-network}

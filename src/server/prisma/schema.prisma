@@ -1,0 +1,379 @@
+// Prisma is the ORM for server-side (API) access to the database
+//
+// This file defines the schema for the database.
+//  - make sure to run 'prisma generate' after making changes to this file
+//  - make sure to run 'prisma db push' to sync the remote database with the schema
+//
+// Database is optional: when the environment variables are not set, the database is not used at all,
+// and the storage of data in AIGC-Club is limited to client-side (browser) storage.
+//
+// The database is used for:
+//  - the 'sharing' function, to let users share the chats with each other
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+}
+
+//
+// Storage of Linked Data
+//
+model LinkStorage {
+  id String @id @default(uuid())
+
+  ownerId    String
+  visibility LinkStorageVisibility
+
+  dataType  LinkStorageDataType
+  dataTitle String?
+  dataSize  Int
+  data      Json
+
+  upVotes    Int @default(0)
+  downVotes  Int @default(0)
+  flagsCount Int @default(0)
+  readCount  Int @default(0)
+  writeCount Int @default(1)
+
+  // time-based expiration
+  expiresAt DateTime?
+
+  // manual deletion
+  deletionKey String
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum LinkStorageVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum LinkStorageDataType {
+  CHAT_V1
+}
+
+
+// ============================================================
+// 用户系统 & 金币计费
+// ============================================================
+
+model User {
+  id           String   @id @default(uuid())
+  shortId      Int?     @unique // 唯一编号
+  username     String?  @unique // 辅助登录名
+  email        String   @unique
+  passwordHash String
+  nickname     String
+  avatar       String?
+  role         UserRole @default(USER)
+  coinBalance  Int      @default(1) // 注册赠送 1 金币
+  emailVerified DateTime?
+  isActive      Boolean  @default(true)
+
+  // 审计与运营字段
+  lastLoginAt  DateTime?
+  lastLoginIP  String?
+  adminNotes   String?
+  tags         String?
+  inviterId    String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactions  CoinTransaction[]
+  refreshTokens RefreshToken[]
+  paymentOrders PaymentOrder[]
+  coinGrants    CoinGrant[]
+  coinReservations CoinReservation[]
+  referralRewardsReceived ReferralReward[] @relation("ReferralRewardReferredUser")
+  referralRewardsSent ReferralReward[] @relation("ReferralRewardReferrerUser")
+  redeemClaims  RedeemCodeClaim[]
+  announcementReads AnnouncementRead[]
+}
+
+model InvitationCode {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  maxUses   Int      @default(1)
+  usedCount Int      @default(0)
+  rewardCoins Int    @default(0)
+  expiresAt DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+model CoinTransaction {
+  id          String          @id @default(uuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        TransactionType
+  amount      Int // 正=增加, 负=扣除
+  balance     Int // 交易后余额快照
+  modelId     String? // 消费时对应的模型
+  description String
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum TransactionType {
+  RECHARGE
+  CONSUME
+  GIFT
+  REFUND
+}
+
+model ModelPricing {
+  id        String        @id @default(uuid())
+  modelId   String        @unique
+  modelName String
+  category  ModelCategory
+  coinCost  Int
+  isActive  Boolean       @default(true)
+  updatedAt DateTime      @updatedAt
+
+  @@index([category, isActive])
+}
+
+enum ModelCategory {
+  CHAT
+  IMAGE
+  VIDEO
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, code])
+  @@index([email])
+}
+
+model PaymentOrder {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderNo       String      @unique
+  packageId     String?
+  channel       PayChannel
+  amountYuan    Float
+  coinAmount    Int
+  coinExpireDays Int?
+  status        OrderStatus @default(PENDING)
+  transactionId String? // 第三方支付流水号
+  paidAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([channel, createdAt])
+}
+
+model ReferralReward {
+  id              String             @id @default(uuid())
+  referrerUserId  String
+  referrerUser    User               @relation("ReferralRewardReferrerUser", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referredUserId  String
+  referredUser    User               @relation("ReferralRewardReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  paymentOrderId  String?            @unique
+  type            ReferralRewardType
+  rewardCoins     Int
+  rechargeSequence Int?
+  createdAt       DateTime           @default(now())
+
+  @@index([referrerUserId, createdAt])
+  @@index([referredUserId, createdAt])
+  @@index([type, createdAt])
+}
+
+enum ReferralRewardType {
+  SIGNUP
+  RECHARGE
+}
+
+model RechargePackageConfig {
+  id            String   @id @default(uuid())
+  packageId     String   @unique
+  label         String
+  amountYuan    Float
+  coinAmount    Int
+  expiresInDays Int?
+  isActive      Boolean  @default(true)
+  popular       Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model CoinGrant {
+  id             String             @id @default(uuid())
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceType     CoinGrantSourceType
+  sourceRef      String?
+  totalCoins     Int
+  remainingCoins Int
+  expiresAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([userId, expiresAt])
+  @@index([userId, remainingCoins])
+}
+
+model CoinReservation {
+  id            String                @id
+  taskKey       String                @unique
+  userId        String
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelId       String?
+  amount        Int
+  status        CoinReservationStatus
+  description   String?
+  expiresAt     DateTime
+  settledAt     DateTime?
+  releasedAt    DateTime?
+  releaseReason String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([userId, status, createdAt], map: "CoinReservation_user_status_created_idx")
+  @@index([status, expiresAt], map: "CoinReservation_status_expires_idx")
+}
+
+enum CoinReservationStatus {
+  PENDING
+  SETTLED
+  RELEASED
+}
+
+model RedeemCode {
+  id                      String            @id @default(uuid())
+  code                    String            @unique
+  coinAmount              Int
+  totalUseLimit           Int?
+  usedCount               Int               @default(0)
+  coinExpireDays          Int?
+  validFrom               DateTime?
+  expiresAt               DateTime?
+  onlyExistingUsers       Boolean           @default(false)
+  existingUsersCutoff     DateTime?
+  description             String?
+  isActive                Boolean           @default(true)
+  createdBy               String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  claims                  RedeemCodeClaim[]
+
+  @@index([isActive, createdAt])
+  @@index([expiresAt])
+}
+
+model RedeemCodeClaim {
+  id            String     @id @default(uuid())
+  redeemCodeId  String
+  redeemCode    RedeemCode @relation(fields: [redeemCodeId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claimedCoins  Int
+  createdAt     DateTime   @default(now())
+
+  @@unique([redeemCodeId, userId])
+  @@index([userId, createdAt])
+}
+
+enum CoinGrantSourceType {
+  RECHARGE
+  ADMIN
+  GIFT
+  REFUND
+  LEGACY
+}
+
+enum PayChannel {
+  WECHAT
+  ALIPAY
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model SiteAnnouncement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   @default("info") // info, warning, success, danger
+  imageUrl  String?  // 公告配图 URL
+  isActive  Boolean  @default(true)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reads     AnnouncementRead[]
+
+  @@index([isActive, expiresAt])
+}
+
+model AnnouncementRead {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcementId String
+  announcement   SiteAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  readAt         DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, announcementId])
+  @@index([userId, readAt])
+  @@index([announcementId])
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  group     String   @default("general")
+  description String?
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+}
