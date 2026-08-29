@@ -112,15 +112,16 @@ export function RelayModelsSection() {
   const lastSavedRef = React.useRef<FormState | null>(null);
 
   const chatPresets = React.useMemo(() => ([
-    { group: 'Gemini', label: 'Gemini-3-Flash', modelId: 'gemini-3-flash-preview', cost: 1, transport: 'gemini-generate-content' },
-    { group: 'Gemini', label: 'Gemini-3.1-Pro', modelId: 'gemini-3.1-pro-preview', cost: 4, transport: 'gemini-generate-content' },
-    { group: 'Anthropic', label: 'Claude-Opus-4-6', modelId: 'claude-opus-4-6', cost: 8, transport: 'anthropic' },
-    { group: 'Anthropic', label: 'Claude-Opus-4-5', modelId: 'claude-opus-4-5', cost: 5, transport: 'anthropic' },
-    { group: 'Anthropic', label: 'Claude-Sonnet-4-6', modelId: 'claude-sonnet-4-6', cost: 4, transport: 'anthropic' },
-    { group: 'Anthropic', label: 'Claude-Sonnet-4-5', modelId: 'claude-sonnet-4-5', cost: 3, transport: 'anthropic' },
-    { group: 'OpenAI', label: 'Gpt-5.4', modelId: 'gpt-5.4', cost: 5, transport: 'openai-images' },
-    { group: 'OpenAI', label: 'Gpt-5.3-Codex', modelId: 'gpt-5.3-codex', cost: 3, transport: 'openai-images' },
-    { group: 'xAI', label: 'Grok-4.1', modelId: 'grok-4.1', cost: 3, transport: 'openai-images' },
+    { group: 'Gemini', label: 'Gemini-3.5-Flash', modelId: 'gemini-3.5-flash-preview', cost: 1, transport: 'gemini-generate-content' },
+    { group: 'Gemini', label: 'Gemini-3.7-Flash', modelId: 'gemini-3.7-flash', cost: 2, transport: 'gemini-generate-content' },
+    { group: 'Gemini', label: 'Gemini-3.1-Pro', modelId: 'gemini-3.1-pro-preview', cost: 3, transport: 'gemini-generate-content' },
+    { group: 'OpenAI', label: 'GPT-5.5', modelId: 'gpt-5.5', cost: 4, transport: 'openai-images' },
+    { group: 'OpenAI', label: 'GPT-5.6-Terra', modelId: 'gpt-5.6-terra', cost: 3, transport: 'openai-images' },
+    { group: 'OpenAI', label: 'GPT-5.6-Sol', modelId: 'gpt-5.6-sol', cost: 6, transport: 'openai-images' },
+    { group: 'Claude', label: 'Claude-Opus-4-8', modelId: 'claude-opus-4-8', cost: 6, transport: 'anthropic' },
+    { group: 'Claude', label: 'Claude-Sonnet-5', modelId: 'claude-sonnet-5', cost: 5, transport: 'anthropic' },
+    { group: 'Claude', label: 'Claude-Opus-5', modelId: 'claude-opus-5', cost: 7, transport: 'anthropic' },
+    { group: 'xAI', label: 'Grok-4.6', modelId: 'grok-4.6', cost: 3, transport: 'openai-images' },
   ]), []);
 
   const { data, isLoading, refetch } = (apiQuery.admin.getRelayModelConfig as any).useQuery(undefined, {

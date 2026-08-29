@@ -22,15 +22,16 @@ export function PricingSection() {
   const [bulkLoading, setBulkLoading] = React.useState<'CHAT' | 'IMAGE' | 'VIDEO' | null>(null);
 
   const chatPresets = React.useMemo(() => ([
-    { group: 'Gemini', label: 'Gemini-3-Flash', modelId: 'gemini-3-flash-preview', coinCost: 1 },
-    { group: 'Gemini', label: 'Gemini-3.1-Pro', modelId: 'gemini-3.1-pro-preview', coinCost: 4 },
-    { group: 'Anthropic', label: 'Claude-Opus-4-6', modelId: 'claude-opus-4-6', coinCost: 8 },
-    { group: 'Anthropic', label: 'Claude-Opus-4-5', modelId: 'claude-opus-4-5', coinCost: 5 },
-    { group: 'Anthropic', label: 'Claude-Sonnet-4-6', modelId: 'claude-sonnet-4-6', coinCost: 4 },
-    { group: 'Anthropic', label: 'Claude-Sonnet-4-5', modelId: 'claude-sonnet-4-5', coinCost: 3 },
-    { group: 'OpenAI', label: 'Gpt-5.4', modelId: 'gpt-5.4', coinCost: 5 },
-    { group: 'OpenAI', label: 'Gpt-5.3-Codex', modelId: 'gpt-5.3-codex', coinCost: 3 },
-    { group: 'xAI', label: 'Grok-4.1', modelId: 'grok-4.1', coinCost: 3 },
+    { group: 'Gemini', label: 'Gemini-3.5-Flash', modelId: 'gemini-3.5-flash-preview', coinCost: 1 },
+    { group: 'Gemini', label: 'Gemini-3.7-Flash', modelId: 'gemini-3.7-flash', coinCost: 2 },
+    { group: 'Gemini', label: 'Gemini-3.1-Pro', modelId: 'gemini-3.1-pro-preview', coinCost: 3 },
+    { group: 'OpenAI', label: 'GPT-5.5', modelId: 'gpt-5.5', coinCost: 4 },
+    { group: 'OpenAI', label: 'GPT-5.6-Terra', modelId: 'gpt-5.6-terra', coinCost: 3 },
+    { group: 'OpenAI', label: 'GPT-5.6-Sol', modelId: 'gpt-5.6-sol', coinCost: 6 },
+    { group: 'Claude', label: 'Claude-Opus-4-8', modelId: 'claude-opus-4-8', coinCost: 6 },
+    { group: 'Claude', label: 'Claude-Sonnet-5', modelId: 'claude-sonnet-5', coinCost: 5 },
+    { group: 'Claude', label: 'Claude-Opus-5', modelId: 'claude-opus-5', coinCost: 7 },
+    { group: 'xAI', label: 'Grok-4.6', modelId: 'grok-4.6', coinCost: 3 },
   ]), []);
 
   const videoPresets = React.useMemo(() => ([

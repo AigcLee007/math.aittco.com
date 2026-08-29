@@ -32,6 +32,88 @@ export interface ModelRouteDefinition {
  * },
  */
 export const MODEL_ROUTE_TABLE: Record<string, ModelRouteDefinition> = {
+  // AITTCO relay: configured Gemini text models
+  'gemini-3.5-flash-preview': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'gemini-generate-content',
+    upstreamModel: 'gemini-3.5-flash-preview',
+  },
+  'gemini-3.7-flash': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'gemini-generate-content',
+    upstreamModel: 'gemini-3.7-flash',
+  },
+  'gemini-3.1-pro-preview': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'gemini-generate-content',
+    upstreamModel: 'gemini-3.1-pro-preview',
+  },
+
+  // AITTCO relay: configured OpenAI-compatible text models
+  'gpt-5.5': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'openai-images',
+    upstreamModel: 'gpt-5.5',
+    endpointPath: '/v1/chat/completions',
+  },
+  'gpt-5.6-terra': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'openai-images',
+    upstreamModel: 'gpt-5.6-terra',
+    endpointPath: '/v1/chat/completions',
+  },
+  'gpt-5.6-sol': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'openai-images',
+    upstreamModel: 'gpt-5.6-sol',
+    endpointPath: '/v1/chat/completions',
+  },
+
+  // AITTCO relay: configured Claude text models (Anthropic-native protocol)
+  'claude-opus-4-8': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'anthropic',
+    upstreamModel: 'claude-opus-4-8',
+  },
+  'claude-sonnet-5': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'anthropic',
+    upstreamModel: 'claude-sonnet-5',
+  },
+  'claude-opus-5': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'anthropic',
+    upstreamModel: 'claude-opus-5',
+  },
+
+  // AITTCO relay: xAI exposes an OpenAI-compatible chat interface
+  'grok-4.6': {
+    routeId: 'aittco',
+    hostEnv: 'AITTCO_API_HOST',
+    keyEnv: 'AITTCO_API_KEY',
+    protocol: 'openai-images',
+    upstreamModel: 'grok-4.6',
+    endpointPath: '/v1/chat/completions',
+  },
+
   // AITTCO relay: Gemini image generation models
   'gemini-3-pro-image-preview': {
     routeId: 'aittco',

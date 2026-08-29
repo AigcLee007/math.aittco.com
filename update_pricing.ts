@@ -6,13 +6,16 @@ async function main() {
   console.log('开始更新模型定价数据...');
 
   const modelPricingData = [
-    { modelId: 'googleai/gemini-3-flash', modelName: 'Gemini 3 Flash (Prefix)', category: 'CHAT' as any, coinCost: 1 },
-    { modelId: 'googleai/gemini-3-pro', modelName: 'Gemini 3 Pro (Prefix)', category: 'CHAT' as any, coinCost: 3 },
-    { modelId: 'googleai/gemini-3.1-pro', modelName: 'Gemini 3.1 Pro (Prefix)', category: 'CHAT' as any, coinCost: 4 },
-    { modelId: 'googleai/gemini-1.5-flash', modelName: 'Gemini 1.5 Flash', category: 'CHAT' as any, coinCost: 1 },
-    { modelId: 'googleai/gemini-1.5-pro', modelName: 'Gemini 1.5 Pro', category: 'CHAT' as any, coinCost: 3 },
-    { modelId: 'openai/gpt-4o', modelName: 'GPT-4o', category: 'CHAT' as any, coinCost: 5 },
-    { modelId: 'anthropic/claude-3-5-sonnet-20240620', modelName: 'Claude 3.5 Sonnet', category: 'CHAT' as any, coinCost: 5 },
+    { modelId: 'gemini-3.5-flash-preview', modelName: 'Gemini-3.5-Flash', category: 'CHAT' as any, coinCost: 1, isActive: true },
+    { modelId: 'gemini-3.7-flash', modelName: 'Gemini-3.7-Flash', category: 'CHAT' as any, coinCost: 2, isActive: true },
+    { modelId: 'gemini-3.1-pro-preview', modelName: 'Gemini-3.1-Pro', category: 'CHAT' as any, coinCost: 3, isActive: true },
+    { modelId: 'gpt-5.5', modelName: 'GPT-5.5', category: 'CHAT' as any, coinCost: 4, isActive: true },
+    { modelId: 'gpt-5.6-terra', modelName: 'GPT-5.6-Terra', category: 'CHAT' as any, coinCost: 3, isActive: true },
+    { modelId: 'gpt-5.6-sol', modelName: 'GPT-5.6-Sol', category: 'CHAT' as any, coinCost: 6, isActive: true },
+    { modelId: 'claude-opus-4-8', modelName: 'Claude-Opus-4-8', category: 'CHAT' as any, coinCost: 6, isActive: true },
+    { modelId: 'claude-sonnet-5', modelName: 'Claude-Sonnet-5', category: 'CHAT' as any, coinCost: 5, isActive: true },
+    { modelId: 'claude-opus-5', modelName: 'Claude-Opus-5', category: 'CHAT' as any, coinCost: 7, isActive: true },
+    { modelId: 'grok-4.6', modelName: 'Grok-4.6', category: 'CHAT' as any, coinCost: 3, isActive: true },
   ];
 
   for (const pricing of modelPricingData) {
@@ -23,6 +26,11 @@ async function main() {
     });
     console.log(`已更新/创建: ${pricing.modelId}`);
   }
+
+  await prisma.modelPricing.updateMany({
+    where: { category: 'CHAT', modelId: { notIn: modelPricingData.map((pricing) => pricing.modelId) } },
+    data: { isActive: false },
+  });
 
   console.log('✅ 数据库定价数据更新完成！');
 }

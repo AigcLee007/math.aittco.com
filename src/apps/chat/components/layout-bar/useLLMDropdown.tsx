@@ -36,13 +36,19 @@ function getVendorLogoSrc(vId: string | undefined): string | undefined {
 // Map specific model labels to localized descriptions for a premium look
 function getCustomModelDescription(label: string, fallback: string): string {
   const lcLabel = label.toLowerCase();
+  if (lcLabel.includes('gemini-3.5-flash') || lcLabel.includes('gemini-3.7-flash')) return 'Google fast multimodal model, optimized for low-latency chat.';
   if (lcLabel.includes('gemini-3-flash')) return 'Google fast multimodal model, optimized for low-latency chat.';
   if (lcLabel.includes('gemini-3-pro')) return 'Google strong reasoning model, suitable for complex tasks.';
   if (lcLabel.includes('gemini-3.1-pro')) return 'Enhanced Gemini Pro with stronger reasoning and tool usage.';
+  if (lcLabel.includes('claude-opus-4-8') || lcLabel.includes('claude-opus-5')) return 'Anthropic flagship model focused on deep reasoning and high-quality writing.';
+  if (lcLabel.includes('claude-sonnet-5')) return 'Anthropic balanced model for fast, capable everyday assistance.';
   if (lcLabel.includes('claude-opus-4-6-thinking')) return 'Claude Opus with deeper chain-of-thought style reasoning.';
   if (lcLabel.includes('claude-opus-4-6-(adaptive)')) return 'Claude Opus adaptive variant for hard reasoning tasks.';
   if (lcLabel.includes('claude-opus-4-6')) return 'Anthropic flagship model focused on high-quality reasoning.';
+  if (lcLabel.includes('gpt-5.5') || lcLabel.includes('gpt-5.6-sol')) return 'OpenAI frontier model with strong reasoning, coding, and general capabilities.';
+  if (lcLabel.includes('gpt-5.6-terra')) return 'OpenAI model balancing response speed, reasoning, and coding quality.';
   if (lcLabel.includes('gpt-5.4')) return 'OpenAI flagship model with strong coding and general capabilities.';
+  if (lcLabel.includes('grok-4.6')) return 'xAI frontier model with strong reasoning performance.';
   if (lcLabel.includes('grok-4')) return 'xAI frontier model with strong reasoning performance.';
 
   if (fallback?.startsWith('No description')) return 'Leading chat model in the current configured set.';
@@ -80,9 +86,17 @@ function getLlmModelRef(llm: DLLM): string {
 function getConfiguredModelDescription(modelId: string, llm: DLLM): string {
   const normalizedModelId = normalizeModelRef(modelId);
   const descriptions: Record<string, string> = {
+    'gemini-3.5-flash-preview': 'Gemini 3.5 Flash：低延迟、高性价比，适合高频日常对话与轻量任务。',
+    'gemini-3.7-flash': 'Gemini 3.7 Flash：兼顾速度与质量，适合通用对话和快速内容生成。',
     'gemini-3-flash-preview': 'Gemini 3 Flash：主打速度与低延迟，适合高频日常对话与轻量任务。',
     'gemini-3-pro-preview': 'Gemini 3 Pro：推理与代码能力更强，适合复杂分析与长上下文任务。',
     'gemini-3.1-pro-preview': 'Gemini 3.1 Pro：在复杂推理与稳定性上进一步增强，适合高要求生产场景。',
+    'gpt-5.5': 'GPT-5.5：新一代通用旗舰模型，代码、推理、写作与工具调用能力全面。',
+    'gpt-5.6-terra': 'GPT-5.6-Terra：平衡速度与质量，适合通用办公、研发协作和复杂问答。',
+    'gpt-5.6-sol': 'GPT-5.6-Sol：强调深度推理与高质量输出，适合复杂分析和工程任务。',
+    'claude-opus-4-8': 'Claude Opus 4.8：旗舰级深度推理模型，适合严谨分析、长文写作与复杂代码。',
+    'claude-sonnet-5': 'Claude Sonnet 5：速度与质量平衡，适合通用办公、研发协作与内容生成。',
+    'claude-opus-5': 'Claude Opus 5：新一代旗舰模型，适合高难度推理、长上下文和高质量创作。',
     'claude-opus-4-6': 'Claude Opus 4.6：高端旗舰模型，擅长深度推理、长文写作与严谨表达。',
     'claude-opus-4-5': 'Claude Opus 4.5：强调高质量推理与文本理解，综合能力均衡。',
     'claude-sonnet-4-6': 'Claude Sonnet 4.6：速度与质量平衡，适合通用办公与研发协作。',
@@ -92,6 +106,7 @@ function getConfiguredModelDescription(modelId: string, llm: DLLM): string {
     'gpt-5.3-codex-high': 'GPT-5.3 Codex High：更偏深度推理与复杂代码任务，质量优先。',
     'gpt-5.3-codex-medium': 'GPT-5.3 Codex Medium：在速度与质量间平衡，适合多数开发任务。',
     'gpt-5.3-codex-low': 'GPT-5.3 Codex Low：响应更快、质量高，适合轻量编码需求。',
+    'grok-4.6': 'Grok 4.6：xAI 新一代通用模型，适合实时问答、推理与多领域分析。',
     'grok-4.1': 'Grok 4.1：通用对话与推理能力突出，适合实时问答与多领域分析。',
   };
 
@@ -128,7 +143,7 @@ const VENDOR_GROUP_ORDER: Record<VendorGroup, number> = {
 const VENDOR_GROUP_LABEL: Record<VendorGroup, string> = {
   googleai: 'GEMINI',
   openai: 'OPENAI',
-  anthropic: 'ANTHROPIC',
+  anthropic: 'CLAUDE',
   xai: 'XAI',
   other: 'OTHER',
 };
@@ -242,11 +257,11 @@ function LLMDropdown(props: {
     });
 
     if (!props.keepInputOrder) {
-      // Custom sort: Gemini, Claude, GPT, Grok
+      // Custom sort: Gemini, OpenAI, Claude, Grok
       const vendorPriority: Record<string, number> = {
         'googleai': 1,
-        'anthropic': 2,
-        'openai': 3,
+        'openai': 2,
+        'anthropic': 3,
         'xai': 4,
       };
       filteredLLMs.sort((a, b) => {

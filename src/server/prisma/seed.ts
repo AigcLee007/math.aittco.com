@@ -6,19 +6,20 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('开始初始化数据库种子数据...');
 
-  const modelPricingData = [
-    { modelId: 'gemini-3-flash-preview', modelName: 'Gemini-3-Flash', category: 'CHAT' as const, coinCost: 1 },
-    { modelId: 'googleai/gemini-3-flash-preview', modelName: 'Gemini-3-Flash', category: 'CHAT' as const, coinCost: 1 },
-    { modelId: 'gemini-3-pro-preview', modelName: 'Gemini-3-Pro', category: 'CHAT' as const, coinCost: 3 },
-    { modelId: 'googleai/gemini-3-pro-preview', modelName: 'Gemini-3-Pro', category: 'CHAT' as const, coinCost: 3 },
-    { modelId: 'gemini-3.1-pro-preview', modelName: 'Gemini-3.1-Pro', category: 'CHAT' as const, coinCost: 4 },
-    { modelId: 'googleai/gemini-3.1-pro-preview', modelName: 'Gemini-3.1-Pro', category: 'CHAT' as const, coinCost: 4 },
-    { modelId: 'claude-opus-4-6', modelName: 'Claude-Opus-4-6', category: 'CHAT' as const, coinCost: 6 },
-    { modelId: 'anthropic/claude-opus-4-6', modelName: 'Claude-Opus-4-6', category: 'CHAT' as const, coinCost: 6 },
-    { modelId: 'gpt-4o', modelName: 'GPT-4o', category: 'CHAT' as const, coinCost: 2 },
-    { modelId: 'gpt-4-turbo', modelName: 'GPT-4 Turbo', category: 'CHAT' as const, coinCost: 3 },
-    { modelId: 'gpt-5.2-thinking', modelName: 'Gpt-5.2-Thinking', category: 'CHAT' as const, coinCost: 10 },
+  const chatModelPricingData = [
+    { modelId: 'gemini-3.5-flash-preview', modelName: 'Gemini-3.5-Flash', category: 'CHAT' as const, coinCost: 1 },
+    { modelId: 'gemini-3.7-flash', modelName: 'Gemini-3.7-Flash', category: 'CHAT' as const, coinCost: 2 },
+    { modelId: 'gemini-3.1-pro-preview', modelName: 'Gemini-3.1-Pro', category: 'CHAT' as const, coinCost: 3 },
+    { modelId: 'gpt-5.5', modelName: 'GPT-5.5', category: 'CHAT' as const, coinCost: 4 },
+    { modelId: 'gpt-5.6-terra', modelName: 'GPT-5.6-Terra', category: 'CHAT' as const, coinCost: 3 },
+    { modelId: 'gpt-5.6-sol', modelName: 'GPT-5.6-Sol', category: 'CHAT' as const, coinCost: 6 },
+    { modelId: 'claude-opus-4-8', modelName: 'Claude-Opus-4-8', category: 'CHAT' as const, coinCost: 6 },
+    { modelId: 'claude-sonnet-5', modelName: 'Claude-Sonnet-5', category: 'CHAT' as const, coinCost: 5 },
+    { modelId: 'claude-opus-5', modelName: 'Claude-Opus-5', category: 'CHAT' as const, coinCost: 7 },
+    { modelId: 'grok-4.6', modelName: 'Grok-4.6', category: 'CHAT' as const, coinCost: 3 },
+  ];
 
+  const nonChatModelPricingData = [
     { modelId: 'gemini-3-pro-image-preview', modelName: 'Nano Banana Pro（线路一）', category: 'IMAGE' as const, coinCost: 12 },
     { modelId: 'nano-banana-2', modelName: 'Nano Banana Pro（线路二）', category: 'IMAGE' as const, coinCost: 12 },
     { modelId: 'gemini-3.1-flash-image-preview', modelName: 'Nano Banana 2', category: 'IMAGE' as const, coinCost: 6 },
@@ -33,6 +34,8 @@ async function main() {
     { modelId: 'gemini-3.1-flash-image-preview-vip-4k', modelName: 'Nano Banana 2(vip) 4K', category: 'IMAGE' as const, coinCost: 12 },
   ];
 
+  const modelPricingData = [...chatModelPricingData, ...nonChatModelPricingData];
+
   const existingModelPricingCount = await (prisma as any).modelPricing.count().catch(() => 0);
   if (existingModelPricingCount === 0) {
     for (const pricing of modelPricingData) {
@@ -44,7 +47,24 @@ async function main() {
     }
     console.log('模型定价数据初始化完成');
   } else {
-    console.log(`检测到已有 ${existingModelPricingCount} 条模型定价配置，跳过默认模型灌库，保留后台当前设置`);
+    // Keep image/video settings untouched while making the active chat catalog
+    // deterministic across deployments. Historical chat rows stay available
+    // for billing records but no longer appear in the user dropdown.
+    for (const pricing of chatModelPricingData) {
+      await (prisma as any).modelPricing.upsert({
+        where: { modelId: pricing.modelId },
+        update: { modelName: pricing.modelName, category: pricing.category, coinCost: pricing.coinCost, isActive: true },
+        create: { ...pricing, isActive: true },
+      });
+    }
+    await (prisma as any).modelPricing.updateMany({
+      where: {
+        category: 'CHAT',
+        modelId: { notIn: chatModelPricingData.map((pricing) => pricing.modelId) },
+      },
+      data: { isActive: false },
+    });
+    console.log(`检测到已有 ${existingModelPricingCount} 条模型定价配置，已同步最新文本模型并停用旧模型`);
   }
 
   await (prisma as any).systemConfig.upsert({

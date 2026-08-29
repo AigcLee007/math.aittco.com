@@ -368,7 +368,7 @@ export async function resolveImageModelRoute(model: string): Promise<ModelRelayR
   };
 }
 
-export async function resolvePromptModelRoute(model = 'gemini-3-pro-preview'): Promise<ModelRelayRoute> {
+export async function resolvePromptModelRoute(model = 'gemini-3.5-flash-preview'): Promise<ModelRelayRoute> {
   const normalized = normalizeModelId(model);
   const runtimeConfig = await loadRelayRuntimeConfig();
   const definition = runtimeConfig.modelRouteOverrides[normalized] || MODEL_ROUTE_TABLE[normalized] || getDefaultModelRoute(normalized);
