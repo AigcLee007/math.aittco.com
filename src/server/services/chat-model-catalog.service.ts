@@ -1,5 +1,5 @@
-import { getChatModelCatalogPlan } from '~/common/models/chat-model-catalog';
-import { prismaDb } from '~/server/prisma/prismaDb';
+import { getChatModelCatalogPlan } from '../../common/models/chat-model-catalog';
+import { prismaDb } from '../prisma/prismaDb';
 
 export async function syncChatModelCatalog(): Promise<{ upserted: number; deactivated: number }> {
   return prismaDb.$transaction(async (tx) => {

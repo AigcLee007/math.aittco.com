@@ -1,6 +1,6 @@
 ﻿import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { getChatModelCatalogPlan } from '~/common/models/chat-model-catalog';
+import { getChatModelCatalogPlan } from '../../common/models/chat-model-catalog';
 
 const prisma = new PrismaClient();
 
