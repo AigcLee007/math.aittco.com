@@ -11,6 +11,7 @@ import { TRPCError } from '@trpc/server';
 import { env } from '~/server/env.server';
 
 import { llmsFixupHost, llmsHostnameMatches } from '../openai/openai.access';
+import { CHAT_MODEL_FIXED_API_HOST, isFixedTextModelId } from '~/common/models/chat-model-catalog';
 
 
 // configuration
@@ -78,6 +79,7 @@ const PER_MODEL_BETA_FEATURES: { [modelId: string]: string[] } = {
 // --- Anthropic Access ---
 
 export type AnthropicHeaderOptions = {
+  modelIdForRouting?: string;
   modelIdForBetaFeatures?: string;
   vndAntWebFetch?: boolean;
   vndAnt1MContext?: boolean;
@@ -114,12 +116,13 @@ export function anthropicAccess(access: AnthropicAccessSchema, apiPath: string, 
     || env.AITTCO_API_HOST
     || env.OPENAI_API_HOST
     || '';
+  const isFixedTextModel = isFixedTextModelId(options?.modelIdForRouting || '');
 
-  if (!rawHost)
+  if (!rawHost && !isFixedTextModel)
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Anthropic API Host. Set ANTHROPIC_API_HOST to your relay host.' });
 
   let anthropicHost = llmsFixupHost(
-    rawHost,
+    isFixedTextModel ? CHAT_MODEL_FIXED_API_HOST : rawHost,
     apiPath,
   );
 

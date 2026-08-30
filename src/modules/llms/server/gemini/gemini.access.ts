@@ -17,6 +17,7 @@ import { env } from '~/server/env.server';
 import { GeminiWire_Safety } from '~/modules/aix/server/dispatch/wiretypes/gemini.wiretypes';
 
 import { llmsFixupHost, llmsRandomKeyFromMultiKey } from '../openai/openai.access';
+import { CHAT_MODEL_FIXED_API_HOST, isFixedTextModelId } from '~/common/models/chat-model-catalog';
 
 
 // configuration
@@ -38,10 +39,10 @@ export const geminiAccessSchema = z.object({
 export function geminiAccess(access: GeminiAccessSchema, modelRefId: string | null, apiPath: string, useV1Alpha: boolean): { headers: HeadersInit, url: string } {
 
   const geminiHost = llmsFixupHost(
-    access.geminiHost
+    isFixedTextModelId(modelRefId || '') ? CHAT_MODEL_FIXED_API_HOST : (access.geminiHost
     || env.GEMINI_API_HOST
     || env.OPENAI_API_HOST
-    || DEFAULT_GEMINI_HOST,
+    || DEFAULT_GEMINI_HOST),
     apiPath,
   );
   let geminiKey = access.geminiKey || env.GEMINI_API_KEY || env.OPENAI_API_KEY || '';

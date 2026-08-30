@@ -23,7 +23,7 @@ import {
 } from '../../services/referral.service';
 
 const relayRouteIdSchema = z.string().min(1).transform((value) => value.trim().toLowerCase());
-const relayTransportEnum = z.enum(['gemini-generate-content', 'openai-images', 'anthropic', 'visionary-images']);
+const relayTransportEnum = z.enum(['gemini-generate-content', 'openai-images', 'openai-responses', 'anthropic', 'visionary-images']);
 const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
 const ADMIN_INVITATION_REWARD_LIMIT = 20;
 const RECENT_LOGIN_WINDOW_DAYS = 7;

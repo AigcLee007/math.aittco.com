@@ -24,7 +24,7 @@ import { apiQuery } from '~/common/util/trpc.client';
 import { useAuthStore } from '~/common/stores/auth/useAuthStore';
 
 type RelayRouteId = string;
-type RelayTransport = 'gemini-generate-content' | 'openai-images' | 'anthropic' | 'visionary-images';
+type RelayTransport = 'gemini-generate-content' | 'openai-images' | 'openai-responses' | 'anthropic' | 'visionary-images';
 type LogScope = 'all' | 'video';
 
 type GenerateLogItem = {
@@ -115,13 +115,13 @@ export function RelayModelsSection() {
     { group: 'Gemini', label: 'Gemini-3.5-Flash', modelId: 'gemini-3.5-flash-preview', cost: 1, transport: 'gemini-generate-content' },
     { group: 'Gemini', label: 'Gemini-3.7-Flash', modelId: 'gemini-3.7-flash', cost: 2, transport: 'gemini-generate-content' },
     { group: 'Gemini', label: 'Gemini-3.1-Pro', modelId: 'gemini-3.1-pro-preview', cost: 3, transport: 'gemini-generate-content' },
-    { group: 'OpenAI', label: 'GPT-5.5', modelId: 'gpt-5.5', cost: 4, transport: 'openai-images' },
-    { group: 'OpenAI', label: 'GPT-5.6-Terra', modelId: 'gpt-5.6-terra', cost: 3, transport: 'openai-images' },
-    { group: 'OpenAI', label: 'GPT-5.6-Sol', modelId: 'gpt-5.6-sol', cost: 6, transport: 'openai-images' },
+    { group: 'OpenAI', label: 'GPT-5.5', modelId: 'gpt-5.5', cost: 4, transport: 'openai-responses' },
+    { group: 'OpenAI', label: 'GPT-5.6-Terra', modelId: 'gpt-5.6-terra', cost: 3, transport: 'openai-responses' },
+    { group: 'OpenAI', label: 'GPT-5.6-Sol', modelId: 'gpt-5.6-sol', cost: 6, transport: 'openai-responses' },
     { group: 'Claude', label: 'Claude-Opus-4-8', modelId: 'claude-opus-4-8', cost: 6, transport: 'anthropic' },
     { group: 'Claude', label: 'Claude-Sonnet-5', modelId: 'claude-sonnet-5', cost: 5, transport: 'anthropic' },
     { group: 'Claude', label: 'Claude-Opus-5', modelId: 'claude-opus-5', cost: 7, transport: 'anthropic' },
-    { group: 'xAI', label: 'Grok-4.6', modelId: 'grok-4.6', cost: 3, transport: 'openai-images' },
+    { group: 'xAI', label: 'Grok-4.6', modelId: 'grok-4.6', cost: 3, transport: 'openai-responses' },
   ]), []);
 
   const { data, isLoading, refetch } = (apiQuery.admin.getRelayModelConfig as any).useQuery(undefined, {
@@ -201,7 +201,7 @@ export function RelayModelsSection() {
         resolutionModelPolicy: route?.resolutionModelPolicy === 'suffix' ? 'suffix' : 'same',
         upstreamModel: route?.upstreamModel || pricing.modelId,
         endpointPath: route?.endpointPath
-          || (pricing.category === 'VIDEO' ? '/v2/videos/generations' : (route?.protocol === 'openai-images' ? '/v1/images/generations' : '-')),
+          || (pricing.category === 'VIDEO' ? '/v2/videos/generations' : (route?.protocol === 'openai-images' ? '/v1/images/generations' : route?.protocol === 'openai-responses' ? '/v1/responses' : '-')),
         baseUrl: route?.baseUrl || channel?.baseUrl || '',
         apiKey: route?.apiKey || channel?.apiKey || '',
       };
@@ -370,7 +370,7 @@ export function RelayModelsSection() {
                     ? '/v1/messages'
                     : preset.transport === 'gemini-generate-content'
                       ? ''
-                      : '/v1/chat/completions';
+                      : '/v1/responses';
                   setForm((prev) => ({
                     ...prev,
                     modelId: preset.modelId,
@@ -564,6 +564,7 @@ export function RelayModelsSection() {
                 <FormLabel>传输协议</FormLabel>
                 <Select value={form.transport} onChange={(_, value) => value && setForm({ ...form, transport: value as RelayTransport })}>
                   <Option value="openai-images">openai-images</Option>
+                  <Option value="openai-responses">openai-responses</Option>
                   <Option value="gemini-generate-content">gemini-generate-content</Option>
                   <Option value="visionary-images">visionary-images</Option>
                   <Option value="anthropic">anthropic</Option>
@@ -714,6 +715,7 @@ export function RelayModelsSection() {
                                 routeId: String(row.routeId || 'bltcy').toLowerCase(),
                                 transport: row.transport === 'gemini-generate-content'
                                   || row.transport === 'anthropic'
+                                  || row.transport === 'openai-responses'
                                   || row.transport === 'visionary-images'
                                   ? row.transport
                                   : 'openai-images',
@@ -722,8 +724,10 @@ export function RelayModelsSection() {
                                 endpointPath: row.endpointPath === '-'
                                   ? (row.category === 'VIDEO'
                                       ? '/v2/videos/generations'
-                                      : row.transport === 'visionary-images'
+                                  : row.transport === 'visionary-images'
                                         ? '/openapi/v1/images/generations'
+                                        : row.transport === 'openai-responses'
+                                          ? '/v1/responses'
                                         : '/v1/images/generations')
                                   : row.endpointPath,
                                 baseUrl: row.baseUrl || channel.baseUrl || form.baseUrl,

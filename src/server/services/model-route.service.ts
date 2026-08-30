@@ -3,7 +3,7 @@ import { prismaDb } from '../prisma/prismaDb';
 import { MODEL_ROUTE_TABLE, type ModelRouteDefinition } from './model-route.config';
 
 export type RelayRouteId = string;
-export type RelayTransport = 'gemini-generate-content' | 'openai-images' | 'anthropic' | 'visionary-images';
+export type RelayTransport = 'gemini-generate-content' | 'openai-images' | 'openai-responses' | 'anthropic' | 'visionary-images';
 
 export interface RelayRouteConfig {
   routeId: RelayRouteId;
@@ -62,6 +62,7 @@ function normalizeModelId(model: string): string {
 function isRelayTransport(transport: string): transport is RelayTransport {
   return transport === 'gemini-generate-content'
     || transport === 'openai-images'
+    || transport === 'openai-responses'
     || transport === 'anthropic'
     || transport === 'visionary-images';
 }
@@ -322,7 +323,14 @@ function getDefaultModelRoute(model: string): ModelRouteDefinition {
     };
   }
 
-  if (normalized.includes('gpt-image') || normalized.includes('dall-e') || normalized.startsWith('gpt-')) {
+  if (normalized.startsWith('gpt-') && !normalized.includes('gpt-image') && !normalized.includes('dall-e')) {
+    return {
+      routeId: 'aittco', hostEnv: 'AITTCO_API_HOST', keyEnv: 'AITTCO_API_KEY',
+      protocol: 'openai-responses', upstreamModel: normalized, endpointPath: '/v1/responses',
+    };
+  }
+
+  if (normalized.includes('gpt-image') || normalized.includes('dall-e')) {
     return {
       routeId: 'aittco',
       hostEnv: 'AITTCO_API_HOST',

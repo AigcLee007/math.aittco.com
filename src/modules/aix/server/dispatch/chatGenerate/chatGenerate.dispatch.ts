@@ -2,6 +2,7 @@ import { ANTHROPIC_API_PATHS, anthropicAccess } from '~/modules/llms/server/anth
 import { OPENAI_API_PATHS, openAIAccess } from '~/modules/llms/server/openai/openai.access';
 import { geminiAccess } from '~/modules/llms/server/gemini/gemini.access';
 import { ollamaAccess } from '~/modules/llms/server/ollama/ollama.access';
+import { isFixedTextModelId } from '~/common/models/chat-model-catalog';
 
 import type { AixAPI_Access, AixAPI_Model, AixAPI_ResumeHandle, AixAPIChatGenerate_Request } from '../../api/aix.wiretypes';
 import type { AixDemuxers } from '../stream.demuxers';
@@ -52,7 +53,7 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
     case 'anthropic': {
       const anthHost = (access.anthropicHost || '').toLowerCase();
       const isOfficialAnthropicHost = anthHost.includes('api.anthropic.com') || anthHost.includes('anthropic.hconeai.com');
-      const isRelayAnthropicHost = !!anthHost && !isOfficialAnthropicHost;
+      const isRelayAnthropicHost = isFixedTextModelId(model.id) || (!!anthHost && !isOfficialAnthropicHost);
 
       // [Anthropic, 2025-11-24] Detect if any tool uses Programmatic Tool Calling features (allowed_callers, input_examples)
       const usesProgrammaticToolCalling = chatGenerate.tools?.some(tool =>
@@ -63,6 +64,7 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
       ) ?? false;
 
       const anthropicRequest = anthropicAccess(access, ANTHROPIC_API_PATHS.messages, {
+        modelIdForRouting: model.id,
         modelIdForBetaFeatures: model.id,
         vndAntWebFetch: model.vndAntWebFetch === 'auto',
         vndAnt1MContext: model.vndAnt1MContext === true,

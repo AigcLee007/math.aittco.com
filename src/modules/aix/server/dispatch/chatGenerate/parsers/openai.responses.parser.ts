@@ -250,12 +250,29 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
     // throws on malformed event data
     const chunkData = JSON.parse(eventData);
+    if (typeof chunkData?.type === 'string' && chunkData.type.startsWith('codex.'))
+      return;
+    if (chunkData?.type === 'response.content_part.added' && !chunkData.item_id)
+      chunkData.item_id = `relay-output-${chunkData.output_index ?? 0}`;
 
-    const event = OpenAIWire_API_Responses.StreamingEvent_schema.parse(chunkData);
+    let event: OpenAIWire_API_Responses.StreamingEvent;
+    try {
+      event = OpenAIWire_API_Responses.StreamingEvent_schema.parse(chunkData);
+    } catch (error) {
+      if (chunkData?.type === 'response.completed' && chunkData.response && Array.isArray(chunkData.response.output)) {
+        console.warn('[DEV] AIX: OpenAI Responses: ignoring incompatible completed output items', error);
+        event = OpenAIWire_API_Responses.StreamingEvent_schema.parse({
+          ...chunkData,
+          response: { ...chunkData.response, output: [] },
+        });
+      } else {
+        throw error;
+      }
+    }
     const eventType = event?.type;
 
     // Validations
-    R.validateSequenceNumber(event.sequence_number);
+    R.validateSequenceNumber((event as any).sequence_number);
     R.validateExpectedEventType(eventType);
 
     // Debugging: show the sequence of events
@@ -514,13 +531,17 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
       case 'response.reasoning_summary_text.delta':
         R.summaryPartVisit(eventType, event.output_index, event.summary_index);
-        // .delta: -> append the reasoning content
-        pt.appendReasoningText(R.summaryPartInjectSpacer() ? OPENAI_RESPONSES_SAME_PART_SPACER + event.delta : event.delta);
+        // Relay reasoning summaries are internal metadata; keep them out of the UI.
+        R.summaryPartInjectSpacer();
         break;
 
       case 'response.reasoning_summary_text.done':
         R.summaryPartVisit(eventType, event.output_index, event.summary_index);
         // .text: ignore finalized content, we already transmitted all partials
+        break;
+
+      case 'response.audio.delta':
+        // Audio deltas are not part of the text particle stream.
         break;
 
       // 4.3 - Function Calls
@@ -793,26 +814,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
 
         // Reasoning contains all the reasoning summaries (if present)
         case 'reasoning':
-          const {
-            // id: reasoningId,
-            summary: reasoningSummary,
-            // encrypted_content: reasoningEC,
-          } = oItem;
-
-          // pedantic check
-          if (!Array.isArray(reasoningSummary)) {
-            console.warn('[DEV] AIX: OpenAI-Response-NS unexpected reasoning summary type:', { reasoningSummary });
-            break;
-          }
-
-          // TODO: implement once we know how this looks like
-          for (const item of reasoningSummary) {
-            if (!item.text) {
-              console.warn('[DEV] AIX: OpenAI-Response-NS unexpected reasoning summary item:', { item });
-              continue;
-            }
-            pt.appendReasoningText(item.text);
-          }
+          // Reasoning summaries are internal relay metadata and are not shown in the UI.
           break;
 
         // Message contains the main 'assistant' response

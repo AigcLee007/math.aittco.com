@@ -1054,7 +1054,7 @@ export namespace OpenAIWire_Responses_Items {
   export const ReasoningItem_SummaryTextPart_schema = z.object({
     type: z.literal('summary_text'),
     text: z.string(), // summary text
-  });
+  }).passthrough();
 
 
   // Output Items: Content ('message': ['output_text', 'refusal']), Reasoning ('reasoning': [ReasoningItemSummaryTextPart_schema]), Function Call ('function_call': [OutputFunctionCallItem_schema]), and more
@@ -1077,10 +1077,10 @@ export namespace OpenAIWire_Responses_Items {
      * but the docs say it's required as input?
      * 2026-01-22: re-enabled with nullish, as XAI lists it as required
      */
-    id: z.string().optional(),
-    summary: z.array(ReasoningItem_SummaryTextPart_schema), // summary of the reasoning
+    id: z.string().nullish(),
+    summary: z.any().optional(), // summary of the reasoning; relays may return null or custom fields
     encrypted_content: z.string().nullish(), // populated when a response is generated with reasoning.encrypted_content in the include
-  });
+  }).passthrough();
 
   export type OutputFunctionCallItem = z.infer<typeof OutputFunctionCallItem_schema>;
   const OutputFunctionCallItem_schema = _OutputItemBase_schema.extend({
@@ -1724,6 +1724,11 @@ export namespace OpenAIWire_API_Responses {
     refusal: z.string(),
   });
 
+  const OutputAudioDeltaEvent_schema = z.object({
+    type: z.literal('response.audio.delta'),
+    delta: z.string(),
+  }).passthrough();
+
   // Streaming > Output Item > Reasoning Summary
 
   const _SummaryIndexedEvent_schema = _OutputIndexedEvent_schema.extend({
@@ -1940,6 +1945,7 @@ export namespace OpenAIWire_API_Responses {
     OutputReasoningTextDoneEvent_schema,
     OutputRefusalDeltaEvent_schema,
     OutputRefusalDoneEvent_schema,
+    OutputAudioDeltaEvent_schema,
 
     // Reasoning events
     OutputReasoningSummaryPartAddedEvent_schema,
