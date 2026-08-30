@@ -44,6 +44,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/src/server/prisma ./src/server/prisma
+COPY --from=builder /app/src/common/models ./src/common/models
 COPY --from=builder /app/docker ./docker
 
 RUN rm -f ./docker/print-model-route-summary.ts \
